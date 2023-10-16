@@ -1,0 +1,134 @@
+
+CommandNotFoundError: Your shell has not been properly configured to use 'conda activate'.
+To initialize your shell, run
+
+    $ conda init <SHELL_NAME>
+
+Currently supported shells are:
+  - bash
+  - fish
+  - tcsh
+  - xonsh
+  - zsh
+  - powershell
+
+See 'conda init --help' for more information and options.
+
+IMPORTANT: You may need to close and restart your shell after running 'conda init'.
+
+
+Starting galsim stage at 12:36:11
+/tmp/slurmd/job29299599/slurm_script: line 110: :
+python run_sims.py \
+  galsim \
+  --tilename="$tilename" \
+  --bands="$bands" \
+  --output-desdata="$output" \
+  --config-file="runs/vTest/config.yaml" \
+  --seed="0"
+
+NOW=$( date "+%H:%M:%S" )
+echo "Completed galsim and starting swarp at $NOW"
+
+
+python run_sims.py \
+  swarp \
+  --tilename="$tilename" \
+  --bands="$bands" \
+  --output-desdata="$output" \
+  --config-file="runs/vTest/config.yaml"
+
+NOW=$( date "+%H:%M:%S" )
+echo "Completed swarp and starting source-extractor at $NOW"
+
+
+python run_sims.py \
+  source-extractor \
+  --tilename="$tilename" \
+  --bands="$bands" \
+  --output-desdata="$output" \
+  --config-file="runs/vTest/config.yaml"
+
+NOW=$( date "+%H:%M:%S" )
+echo "Completed coadding and starting source-extractor at $NOW"
+
+
+python run_sims.py \
+  true-detection \
+  --tilename="$tilename" \
+  --bands="$bands" \
+  --output-desdata="$output" \
+  --config-file="runs/vTest/config.yaml"
+
+NOW=$( date "+%H:%M:%S" )
+echo "Completed true-detection and starting meds at $NOW"
+
+
+python run_sims.py \
+  meds \
+  --tilename="$tilename" \
+  --bands="$bands" \
+  --output-desdata="$output" \
+  --config-file="runs/vTest/config.yaml" \
+  --meds-config-file="runs/vTest/meds.yaml"
+NOW=$( date "+%H:%M:%S" )
+echo "Completed meds and starting mcal at $NOW"
+
+
+python run_sims.py \
+  metacal \
+  --tilename="$tilename" \
+  --bands="$bands" \
+  --output-desdata="$output" \
+  --seed="42" \
+  --metacal-config-file="runs/vTest/metacal.yaml"
+
+NOW=$( date "+%H:%M:%S" )
+echo "Completed mcal and starting matching at $NOW"
+
+
+python run_sims.py \
+  match \
+  --tilename="$tilename" \
+  --bands="$bands" \
+  --output-desdata="$output" \
+  --config-file="runs/vTest/config.yaml"
+  
+NOW=$( date "+%H:%M:%S" )
+echo "Completed matching and starting finalize at $NOW"
+
+: No such file or directory
+Traceback (most recent call last):
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/shutil.py", line 816, in move
+    os.rename(src, real_dst)
+OSError: [Errno 18] Invalid cross-device link: '/scratch/midway2/dhayaa/PREP_OUTPUTS/vTest/outputs_DES0740+2625/meds-DES0740+2625-r/sources-r/DEC_Taiga/multiepoch/delve/r5918/DES0740+2625/p03/cat/DES0740+2625_r5918p03_r_cat.fits' -> '/project/chihway/dhayaa/DECADE/Balrog//vTest/SrcExtractor_DES0740+2625_r-cat.fits'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/dhayaa/Desktop/DECADE/Balrog_of_the_decade/run_sims.py", line 253, in <module>
+    cli()
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/site-packages/click/core.py", line 1130, in __call__
+    return self.main(*args, **kwargs)
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/site-packages/click/core.py", line 1055, in main
+    rv = self.invoke(ctx)
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/site-packages/click/core.py", line 1657, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/site-packages/click/core.py", line 1404, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/site-packages/click/core.py", line 760, in invoke
+    return __callback(*args, **kwargs)
+  File "/home/dhayaa/Desktop/DECADE/Balrog_of_the_decade/run_sims.py", line 246, in finalize
+    finalize_files(
+  File "/home/dhayaa/Desktop/DECADE/Balrog_of_the_decade/finalizing.py", line 16, in finalize_files
+    move_SrcExtractor_cat(tilename, b, output_desdata)
+  File "/home/dhayaa/Desktop/DECADE/Balrog_of_the_decade/finalizing.py", line 47, in move_SrcExtractor_cat
+    shutil.move(cat_path, new_path)
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/shutil.py", line 836, in move
+    copy_function(src, real_dst)
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/shutil.py", line 434, in copy2
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+  File "/home/dhayaa/.conda/envs/shearDM/lib/python3.10/shutil.py", line 254, in copyfile
+    with open(src, 'rb') as fsrc:
+FileNotFoundError: [Errno 2] No such file or directory: '/scratch/midway2/dhayaa/PREP_OUTPUTS/vTest/outputs_DES0740+2625/meds-DES0740+2625-r/sources-r/DEC_Taiga/multiepoch/delve/r5918/DES0740+2625/p03/cat/DES0740+2625_r5918p03_r_cat.fits'
+Finished moving meds, mcal, SrcExtractor output to /project/chihway/dhayaa/DECADE/Balrog//vTest at 12:36:50

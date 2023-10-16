@@ -1,0 +1,30 @@
+name: /project/chihway/dhayaa/MyEnvs_Midway2/shearDM
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - conda
+  - des-fitvd
+  - shredx
+  - des-pixcorrect
+  - matplotlib
+  - pandas
+  - numpy
+  - cython
+  - scipy
+  - numba
+  - h5py
+  - ngmix
+  - galsim
+  - click
+  - jinja2
+  - joblib
+  - fitsio
+  - tqdm
+  - des-easyaccess
+  - oracle-instant-client
+  - healpy
+  - jupyter
+  - ipython
+  - treecorr
+prefix: /project/chihway/dhayaa/MyEnvs_Midway2/shearDM
