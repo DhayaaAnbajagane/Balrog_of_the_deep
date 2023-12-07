@@ -145,7 +145,7 @@ class End2EndSimulation(object):
         for noise_seed, se_info in zip(
                 noise_seeds, self.info[band]['src_info']):
 
-            galaxy_src_func = LazySourceCat(
+             galaxy_src_func = LazySourceCat(
                 truth_cat=self.galaxy_truth_catalog,
                 wcs=get_galsim_wcs(
                     image_path=se_info['image_path'],

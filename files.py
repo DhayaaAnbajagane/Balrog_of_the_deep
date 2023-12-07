@@ -225,6 +225,32 @@ def get_nwgint_path(*, meds_dir, medsconf, band):
         'sources-%s'%band)
 
 
+def get_fitvd_path(*, meds_dir, medsconf):
+    """Get the path of the fitvd files.
+
+    Parameters
+    ----------
+    meds_dir : str
+        The DESDATA/MEDS_DIR path where the info file is located.
+    medsconf : str
+        The MEDS file version (e.g., 'y3v02').
+    tilename : str
+        The DES coadd tilename (e.g., 'DES2122+0001').
+    bands : str
+        A bands (e.g., 'r').
+
+    Returns
+    -------
+    path : str
+        The path of list files for coadd generation.
+    """
+    return os.path.join(
+        meds_dir,
+        'simple_des_y3_sims',
+        medsconf,
+        'fitvd')
+
+
 def get_piff_path_from_image_path(*, image_path, piff_run):
     """Get the piff path from the image path.
 

@@ -22,6 +22,7 @@ def finalize_files(tilename, bands, output_desdata, config):
         move_metacal_cat(tilename, output_desdata)
         move_balrog_cat(tilename, output_desdata)
         move_Truth_cat(tilename, output_desdata)
+        move_fitvd(tilename, output_desdata)
     
     except:
         
@@ -104,6 +105,7 @@ def move_metacal_cat(tile, output_desdata):
          
     return True
 
+
 def move_balrog_cat(tile, output_desdata):
     
     args = {'dir'  : output_desdata,
@@ -116,6 +118,25 @@ def move_balrog_cat(tile, output_desdata):
     shutil.move(cat_path, new_path)
          
     return True
+
+
+def move_fitvd_cat(tile, output_desdata):
+    
+    args = {'dir'  : output_desdata,
+            'name' : os.path.basename(os.path.dirname(output_desdata)),
+            'tile' : tile}
+    
+    cat_path = get_fitvd_file_path(meds_dir=output_desdata, medsconf = MEDSCONF, tilename = tile) + '/shredx.fits'
+    new_path = os.environ['BALROG_DIR'] + "/%(name)s/shredx_%(tile)s.fits" % args
+    shutil.move(cat_path, new_path)
+    
+    
+    cat_path = get_fitvd_file_path(meds_dir=output_desdata, medsconf = MEDSCONF, tilename = tile) + '/fitvd.fits'
+    new_path = os.environ['BALROG_DIR'] + "/%(name)s/fitvd_%(tile)s.fits" % args
+    shutil.move(cat_path, new_path)
+         
+    return True
+
 
 def move_meds(tile, band, output_desdata):
     
