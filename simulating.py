@@ -22,8 +22,7 @@ from sky_bounding import get_rough_sky_bounds, radec_to_uv
 from wcsing import get_esutil_wcs, get_galsim_wcs
 from galsiming import render_sources_for_image, Our_params
 from psf_wrapper import PSFWrapper
-from realistic_galaxying import init_desdf_catalog, get_desdf_galaxy
-from realistic_starsing import init_lsst_starsim_catalog
+from realistic_dwarfing import init_dwarf_catalog
 from coadding import MakeSwarpCoadds
 
 logger = logging.getLogger(__name__)
@@ -92,9 +91,8 @@ class End2EndSimulation(object):
         self.truth_cat_rng = np.random.RandomState(seed=seeds[0])
         self.noise_rng     = np.random.RandomState(seed=seeds[1])
         
-        #one for drawing random galaxies from descwl package
-        self.galsource_rng  = np.random.RandomState(seed=seeds[2])
-        self.starsource_rng = np.random.RandomState(seed=seeds[3])
+        #one for drawing random objects from dwarf catalog
+        self.dwarfsource_rng  = np.random.RandomState(seed=seeds[2])
         
         # load the image info for each band
         self.info = {}
@@ -116,19 +114,11 @@ class End2EndSimulation(object):
         self.info = MakeSwarpCoadds(tilename =  self.tilename, bands =  self.bands, output_meds_dir = self.output_meds_dir, config = np.NaN, n_files = None)._make_nwgint_files()
         
         # step 1 - Load simulated galaxy catalog if needed
-        self.galaxy_simulated_catalog = self._make_sim_catalog()
+        self.simulated_catalog = self._make_sim_catalog()
         
         # step 2 - make the truth catalog
-        self.galaxy_truth_catalog = self._make_truth_catalog()
+        self.truth_catalog = self._make_truth_catalog()
         
-        
-        #step 2b - load simulated, truth star catalog
-        if self.star_kws['stars'] == True:
-            self.star_truth_catalog, self.star_simulated_catalog = self._make_star_catalogs()
-        else:
-            self.star_truth_catalog, self.star_simulated_catalog = None, None
-        
-
         # step 3 - per band, write the images to a tile
         for band in self.bands:
             self._run_band(band=band)
@@ -145,49 +135,28 @@ class End2EndSimulation(object):
         for noise_seed, se_info in zip(
                 noise_seeds, self.info[band]['src_info']):
 
-             galaxy_src_func = LazySourceCat(
-                truth_cat=self.galaxy_truth_catalog,
+             src_func = LazySourceCat(
+                truth_cat=self.truth_catalog,
                 wcs=get_galsim_wcs(
                     image_path=se_info['image_path'],
                     image_ext=se_info['image_ext']),
                 psf=self._make_psf_wrapper(se_info=se_info),
-                gal_mag = self.gal_kws['gal_mag'],
-                gal_source = self.gal_kws['gal_source'],
-                galsource_rng = self.galsource_rng,
-                simulated_catalog = self.galaxy_simulated_catalog,
+                source_rng = self.dwarfsource_rng,
+                simulated_catalog = self.simulated_catalog,
                 band = band)
             
-            if self.star_kws['stars'] == True:
-                star_src_func = LazyStarSourceCat(
-                    truth_cat=self.star_truth_catalog,
-                    wcs=get_galsim_wcs(
-                        image_path=se_info['image_path'],
-                        image_ext=se_info['image_ext']),
-                    psf=self._make_psf_wrapper(se_info=se_info),
-                    star_mag = self.star_kws['star_mag'],
-                    star_source = self.star_kws['star_source'],
-                    starsource_rng = self.starsource_rng,
-                    simulated_catalog = self.star_simulated_catalog,
-                    band = band)
-            else:
-                star_src_func = None
-
-            if self.gal_kws.get('galaxies', True):
-                jobs.append(joblib.delayed(_render_se_image)(
-                    se_info=se_info,
-                    band=band,
-                    galaxy_truth_cat=self.galaxy_truth_catalog,
-                    star_truth_cat=self.star_truth_catalog,
-                    bounds_buffer_uv=self.bounds_buffer_uv,
-                    draw_method=self.draw_method,
-                    noise_seed=noise_seed,
-                    output_meds_dir=self.output_meds_dir,
-                    galaxy_src_func=galaxy_src_func,
-                    star_src_func = star_src_func,
-                    gal_kws = self.gal_kws))
-            else:
-                print("NO GALAXY SIMULATED")
-                jobs.append(joblib.delayed(_move_se_img_wgt_bkg)(se_info=se_info, output_meds_dir=self.output_meds_dir))
+            jobs.append(joblib.delayed(_render_se_image)(
+                se_info=se_info,
+                band=band,
+                galaxy_truth_cat=self.galaxy_truth_catalog,
+                star_truth_cat=self.star_truth_catalog,
+                bounds_buffer_uv=self.bounds_buffer_uv,
+                draw_method=self.draw_method,
+                noise_seed=noise_seed,
+                output_meds_dir=self.output_meds_dir,
+                galaxy_src_func=galaxy_src_func,
+                star_src_func = star_src_func,
+                gal_kws = self.gal_kws))
 
         with joblib.Parallel(
                 n_jobs=-1, backend='loky', verbose=50, max_nbytes=None) as p:
@@ -226,30 +195,14 @@ class End2EndSimulation(object):
             image_path=self.info[band]['image_path'],
             image_ext=self.info[band]['image_ext'])
 
-        #Set what type of galaxy counts we use
-        #Either constant counts per tile
-        #or draw from poisson
-        print(self.gal_kws)
-        print(self.psf_kws)
-
-        n_grid = self.gal_kws['n_grid']
-        n_gal  = n_grid**2
-        
         radius = 2*self.gal_kws['size_max']/0.263 #Radius of largest galaxy in pixel units. Factor of 2 to prevent overlap
-        #Set what type of grid we use
-        if self.gal_kws['truth_type'] in ['hexgrid', 'hexgrid-truedet']:
-            ra, dec, x, y = make_coadd_hexgrid_radec(radius = radius,
-                rng=self.truth_cat_rng, coadd_wcs=coadd_wcs,
-                return_xy=True)
-            
-        elif self.gal_kws['truth_type'] in ['grid', 'grid-truedet']:
-            ra, dec, x, y = make_coadd_grid_radec(
-                rng=self.truth_cat_rng, coadd_wcs=coadd_wcs,
-                return_xy=True, n_grid=n_grid)
-            
-        else:
-            raise ValueError("Invalid option for `truth_type`. Use 'hexgrid', 'grid', 'random', 'grid-truedet', or 'random-truedet'.")
-            
+        
+        #These are the positions of the GALAXIES. We'll do the stars ourselves.
+        ra_dwarf, dec_dwarf, x_dwarf, y_dwarf = make_coadd_hexgrid_radec(radius = radius,
+            rng=self.truth_cat_rng, coadd_wcs=coadd_wcs,
+            return_xy=True)
+        
+        #Don't inject a dwarf if it's center is in some masked part of the coadd
         if self.gal_kws.get('AvoidMaskedPix', True):
             
             #Get rid of galaxies in the masks.
@@ -259,13 +212,86 @@ class End2EndSimulation(object):
             gal_mask = bit_mask[y.astype(int), x.astype(int)] == 0 #only select objects whose centers are unmasked
             gal_mask = gal_mask & (wgt[y.astype(int), x.astype(int)] != 0) #Do same thing but for wgt != 0 (nwgint sets wgt == 0 in some places)
 
-            ra, dec = ra[gal_mask], dec[gal_mask]
-            x,  y   = x[gal_mask],  y[gal_mask]
+            ra_dwarf, dec_dwarf = ra_dwarf[gal_mask], dec_dwarf[gal_mask]
+            x_dwarf,  y_dwarf   = x_dwarf[gal_mask],  y_dwarf[gal_mask]
         
         print("TRUTH CATALOG HAS %d OBJECTS" % len(x))
         
         
-        dtype = [('number', 'i8'), ('ID', 'i8'), ('ind', 'i8'), ('inj_class', 'i4'), 
+        #Find which dwarfs we will inject and subsample just the handful we need for this coadd
+        mask_dwarf = self.simulated_catalog.cat['ISDWARF'] == True
+        inds_dwarf = self.dwarfsource_rng.choice(np.where(mask_dwarf)[0], len(ra_dwarf))
+        
+        #Positions and inds. The ind column also doubles as "DWARF or STAR" column since we can use it
+        #to index into the simulated_catalog, which has this info.
+        ra, dec, x, y, inds = [], [], [], [], []
+        
+        #Loop over each dwarf and build its ra and dec
+        for d_i in range(len(ra_dwarf)):
+            
+            ind = inds_dwarf[d_i] #Find dwarf ind
+            
+            #Add dwarf properties to the inputs
+            inds += [ind]
+            ra   += [ra_dwarf[d_i]]
+            dec  += [dec_dwarf[d_i]]
+            x    += [x_dwarf[d_i]]
+            y    += [y_dwarf[d_i]]
+            
+            inds_star = np.where(self.simulated_catalog.cat['PARENT_ID'] == ind)[0] #Find all stars associated with this
+            
+            #Get properties of the dwarf
+            e1, e2 = self.simulated_catalog.cat['e1'][ind], self.simulated_catalog.cat['e2'][ind]
+            hlr    = self.simulated_catalog.cat['hlr'][ind]
+            r0     = hlr / 1.6783469900166605 #Convert from hlr to scale radius of exponential
+            ang    = self.simulated_catalog.rand_rot[ind] * np.pi/180 #put it in radians
+            
+            for s_i in inds_stars:
+                
+                #Find star position using analytical inversion. We sample uniform dist. and convert to exponential dist.
+                r = -r0 * np.log(1 - self.dwarfsource_rng.uniform(1e-16, 1)) #Use min != 0 else you will get r = infty error
+                r = np.clip(r, 0, 4*hlr) #Prevent rare chances that star is placed crazy far away from the galaxy.
+                
+                #Get the x, y of the star. THIS IS W.R.T to galaxy. So x = 0 means center of dwarf. We will fix this later.
+                t = self.dwarfsource_rng.uniform(0, 2*np.pi) #Random angle. This is ang pos of star within galaxy
+                x_star, y_star = r * np.cos(t), np.sin(t)
+                
+                #Now we change the position to account for galaxy ellipticity
+                jac = np.array([[1 - e1, -e2], [-e2, 1 + e1]])
+                
+                x_star, y_star = x * jac[0, 0] + y*jac[0, 1],  x * jac[1, 0] + y*jac[1, 1]
+                
+                #Finally, account for the new (random) galaxy rotation
+                x_star_final = + x_star * np.cos(ang) + y_star * np.sin(ang)
+                y_star_final = - x_star * np.sin(ang) + y_star * np.cos(ang)
+                
+                
+                #Okay, now that all the rotation transforms are done, 
+                #let's add back the host dwarf galaxy position (in image space)
+                x_star_final += x_dwarf[d_i]
+                y_star_final += y_dwarf[d_i]
+                
+                
+                #Also need to get the corresponding RA and DEC now (skycoord). We already loaded the coadd_wcs before.
+                #It's fine if a star goes "out of bounds" of coadd in x, y, ra, dec. We will remove out-of-bounds objs in later step
+                ra_star_final, dec_star_final = coadd_wcs.image2sky(x_star_final, y_star_final)
+                
+                
+                #Now just append everything to list of injection objects
+                inds += [inds_stars[s_i]]
+                ra   += [ra_star_final]
+                dec  += [dec_star_final]
+                x    += [x_star_final]
+                y    += [y_star_final]
+                
+        
+        inds = np.array(inds)
+        ra   = np.array(ra)
+        dec  = np.array(dec)
+        x    = np.array(x)
+        y    = np.array(y)
+        
+        dtype = [('number', 'i8'), ('ID', 'i8'), ('ind', 'i8'), 
                  ('ra',  'f8'), ('dec', 'f8'), ('x', 'f8'), ('y', 'f8'),
                  ('a_world', 'f8'), ('b_world', 'f8'), ('size', 'f8')]
         for b in self.bands:
@@ -274,68 +300,13 @@ class End2EndSimulation(object):
         truth_cat = np.zeros(len(ra), dtype = dtype)# + np.NaN
         
         
-        #Use i-band as reference magnitude
-        mag_ref = 30 - 2.5*np.log10(self.simulated_catalog.cat['FLUX_I'])
-        
-        # A value of 23.0 returns something similar to Balrog Y3
-        # A value of 23.5 maybe is similar to the WL sample in Y6.
-        # A value of 21.5 is maybe optimal for LSS samples in Y6.
-        
-        all_rand_inds = self.galsource_rng.randint(low=0, high=len(self.simulated_catalog.cat), size=len(ra))
-        wl_rand_inds  = mock_balrog_sigmoid(mag_ref, 23.5, self.galsource_rng)
-        
-        #Loop until you get enough high-z galaxies
-        #Just a safety loop so code doesn't fail because we
-        #somehow selected too few galaxies.
-        while True:
-            wl_HQz_inds   = mock_balrog_sigmoid(mag_ref, 23.5, self.galsource_rng)
-            wl_HQz_inds   = wl_HQz_inds[self.simulated_catalog.cat['Z_SOURCE'][wl_HQz_inds] != 0] #Select only indices with high-redshifts
-            
-            #Z_SOURCE HAS FOLLOWING INDICES
-            # Z_SOURCE = 0 --- "NO REDSHIFT"
-            # Z_SOURCE = 1 --- "SPEC-Z"
-            # Z_SOURCE = 2 --- "COSMOS2020"
-            # Z_SOURCE = 3 --- "PAUS+COSMOS"
-            # Z_SOURCE = 4 ---  "C3R2"
-
-            #If we have enough then break out
-            if len(wl_HQz_inds) > len(ra)//4: 
-                print("I HAVE ENOUGH HIGHQ GALAXIES. BREAKING OUT NOW")
-                break
-        
-        
-        inds = np.zeros_like(all_rand_inds) #Array to hold deep field index of galaxy
-        cls  = np.zeros_like(all_rand_inds) #Array to hold injection class
-        
-        quarter = len(ra)//4 #Number of gals that make one quarter of required galaxies
-        
-        #First 1/2 is random balrog
-        inds[:2*quarter] = all_rand_inds[:2*quarter];  cls[:2*quarter] = 0;
-        
-        #Next 1/4 is random WL specific
-        inds[2*quarter:3*quarter] = wl_rand_inds[:quarter]; cls[2*quarter:3*quarter] = 1;
-        
-        #Final 1/4 is WL with high quality redshift data
-        inds[3*quarter:4*quarter] = wl_HQz_inds[:quarter]; cls[3*quarter:4*quarter] = 2;
-        
-        
-        #Now just randomly shuffle the inds. The ra/dec are in a uniform order.
-        #If you don't shuffle inds then galaxies on one side of image will be 1/2 balrog
-        #and remaining would be WL specific. We don't want that
-        shuffle_inds = np.arange(len(inds))
-        self.galsource_rng.shuffle(shuffle_inds)
-        
-        inds = inds[shuffle_inds]
-        truth_cat['inj_class'] = cls[shuffle_inds]
-        
-        
         #Now build truth catalog
         truth_cat['ind']    = inds
-        truth_cat['number'] = np.arange(len(ra)).astype(np.int64) + 1
+        truth_cat['number'] = np.arange(len(ra)).astype(np.int64) + 1 #This doesn't really matter
         truth_cat['ra']  = ra
         truth_cat['dec'] = dec
-        truth_cat['x'] = x
-        truth_cat['y'] = y
+        truth_cat['x']   = x
+        truth_cat['y']   = y
         
         truth_cat['ID'] = self.simulated_catalog.cat['ID'][truth_cat['ind']]
         
@@ -348,13 +319,11 @@ class End2EndSimulation(object):
             for b in self.bands: truth_cat['A%s' % b] = R_SFD98[b] * EBV[inds]
             
         
-        g1 = self.simulated_catalog.cat['BDF_G1'][truth_cat['ind']]
-        g2 = self.simulated_catalog.cat['BDF_G2'][truth_cat['ind']]
-        q  = np.sqrt(g1**2 + g2**2)
-
-        truth_cat['a_world'] = 1
-        truth_cat['b_world'] = q
-        truth_cat['size']    = np.sqrt(self.simulated_catalog.cat['BDF_T'][truth_cat['ind']])
+        #We shouldn't really need to use any of this since we won't be running
+        #in "true-det" mode at any point.
+        truth_cat['a_world'] = np.NaN
+        truth_cat['b_world'] = np.NaN
+        truth_cat['size']    = np.NaN
             
         truth_cat_path = get_truth_catalog_path(
             meds_dir=self.output_meds_dir,
@@ -370,115 +339,10 @@ class End2EndSimulation(object):
         
         """Makes sim catalog"""
         
-        self.simulated_catalog = init_desdf_catalog(rng = self.galsource_rng)
+        self.simulated_catalog = init_dwarf_catalog(rng = self.galsource_rng)
             
-        mag_i = 30 - 2.5*np.log10(self.simulated_catalog.cat['FLUX_I'])
-        hlr   = np.sqrt(self.simulated_catalog.cat['BDF_T']) #This is only approximate
-        Mask  = ((mag_i > self.gal_kws['mag_min']) &  (mag_i < self.gal_kws['mag_max']) &
-                 (hlr > self.gal_kws['size_min'])  &  (hlr < self.gal_kws['size_max'])
-                )
-
-        self.simulated_catalog = self.simulated_catalog._replace(cat = self.simulated_catalog.cat[Mask])
-
-        if self.gal_kws['circular']:
-            #Temporarily remove all ellipticity
-            self.simulated_catalog.cat['BDF_G1'] = 0
-            self.simulated_catalog.cat['BDF_G2'] = 0
-
         return self.simulated_catalog
-    
-    
-    def _make_star_catalogs(self):
-        
-        """Makes sim catalog and truth catalog at same time"""
-        
-        # always done with first band
-        band = self.bands[0]
-        coadd_wcs = get_esutil_wcs(
-            image_path=self.info[band]['image_path'],
-            image_ext=self.info[band]['image_ext'])
-        coadd_info = self.info[band]
-        
-        if self.star_kws['star_source'] in ['lsst_sim']:
 
-            star_catalog, binary_catalog = init_lsst_starsim_catalog(rng = self.starsource_rng)
-
-            star_inds   = _cut_tuth_cat_to_se_image(truth_cat=star_catalog,   se_info=coadd_info, bounds_buffer_uv=self.bounds_buffer_uv)
-            binary_inds = _cut_tuth_cat_to_se_image(truth_cat=binary_catalog, se_info=coadd_info, bounds_buffer_uv=self.bounds_buffer_uv)
-            
-            star_upsample   = 1000 #factor because we didn't download all stars
-            binary_upsample = 10 * 100 #factor because we didn't download all binaries, and only 1/10th of binaries were simulated
-            
-            star_num    = self.star_kws['upscale'] * star_upsample   * len(star_inds)   * (1 - self.star_kws['f_bin'])
-            binary_num  = self.star_kws['upscale'] * binary_upsample * len(binary_inds) * self.star_kws['f_bin']
-            star_inds   = star_inds[self.starsource_rng.randint(len(star_inds),     size = int(star_num))]
-            binary_inds = binary_inds[self.starsource_rng.randint(len(binary_inds), size = int(binary_num))]
-            
-            n_stars = len(star_inds)
-            n_binar = len(binary_inds)
-            n_tot   = n_stars + n_binar
-            ra, dec, x, y = make_coadd_random_radec(rng=self.truth_cat_rng, coadd_wcs=coadd_wcs, return_xy=True, n_gal=n_tot)
-            
-            star_catalog   = star_catalog[star_inds]
-            binary_catalog = binary_catalog[binary_inds]
-            
-            #Fill ra/dec for single star catalog
-            star_catalog['ra']  = ra[:n_stars]
-            star_catalog['dec'] = dec[:n_stars]
-            
-            #Offsets between two stars in binary system. 
-            #Generated in flat-sky. Convert to curved sky for ra_offset. Dec offset is fine
-            angles = self.starsource_rng.random(len(binary_inds))*np.pi
-            sep    = (binary_catalog['a']*2.25461e-8) / (10**(1 + binary_catalog['mu0']/5)) * (180/np.pi) #conv. Rsun to pc, then rad to deg
-            cos    = np.cos(angles) 
-            sin    = np.sin(angles)
-            
-            ra_offset  = cos*sep / np.cos(dec[n_stars:]*np.pi/180)
-            dec_offset = sin*sep
-            
-            
-            binarystar1_catalog = np.zeros(len(binary_inds), dtype = star_catalog.dtype)
-            binarystar1_catalog['mag_g'] = binary_catalog['mag_g_1']
-            binarystar1_catalog['mag_r'] = binary_catalog['mag_r_1']
-            binarystar1_catalog['mag_i'] = binary_catalog['mag_i_1']
-            binarystar1_catalog['mag_z'] = binary_catalog['mag_z_1']
-            binarystar1_catalog['ra']    = ra[n_stars:]
-            binarystar1_catalog['dec']   = dec[n_stars:]
-            
-            binarystar2_catalog = np.zeros(len(binary_inds), dtype = star_catalog.dtype)
-            binarystar2_catalog['mag_g'] = binary_catalog['mag_g_2']
-            binarystar2_catalog['mag_r'] = binary_catalog['mag_r_2']
-            binarystar2_catalog['mag_i'] = binary_catalog['mag_i_2']
-            binarystar2_catalog['mag_z'] = binary_catalog['mag_z_2']
-            binarystar2_catalog['ra']    = ra[n_stars:]  + ra_offset
-            binarystar2_catalog['dec']   = dec[n_stars:] + dec_offset
-            
-            simulated_cat = np.concatenate([star_catalog, binarystar1_catalog, binarystar2_catalog])
-            
-            Mask = ((simulated_cat['mag_i'] > self.star_kws['mag_min']) & 
-                    (simulated_cat['mag_i'] < self.star_kws['mag_max']))
-            
-            simulated_cat = simulated_cat[Mask]
-        
-        #NOW DO TRUTH CATALOG PART
-        truth_cat = np.zeros(len(simulated_cat), dtype=[('number', 'i8'), ('ind', 'i8'), 
-                                             ('ra',  'f8'), ('dec', 'f8'), 
-                                             ('x', 'f8'), ('y', 'f8'),
-                                             ('a_world', 'f8'), ('b_world', 'f8'), ('size', 'f8')])
-
-        truth_cat['number'] = np.arange(len(simulated_cat)).astype(np.int64) + 1
-        truth_cat['ra']     = simulated_cat['ra']
-        truth_cat['dec']    = simulated_cat['dec']
-        
-        x, y = coadd_wcs.sky2image(simulated_cat['ra'], simulated_cat['dec'])
-        truth_cat['x']   = x
-        truth_cat['y']   = y
-        truth_cat['ind'] = truth_cat['number']
-
-        #We don't write the star catalog anywhere because we don't really use it as a data product
-        #in the analysis. Otherwise would write the catalog in here
-        
-        return truth_cat, simulated_cat
 
 def _render_se_image(
         *, se_info, band, galaxy_truth_cat, star_truth_cat, bounds_buffer_uv,
