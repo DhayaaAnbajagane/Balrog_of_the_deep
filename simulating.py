@@ -145,21 +145,27 @@ class End2EndSimulation(object):
                 simulated_catalog = self.simulated_catalog,
                 band = band)
             
-            jobs.append(joblib.delayed(_render_se_image)(
-                se_info=se_info,
-                band=band,
-                galaxy_truth_cat=self.galaxy_truth_catalog,
-                star_truth_cat=self.star_truth_catalog,
-                bounds_buffer_uv=self.bounds_buffer_uv,
-                draw_method=self.draw_method,
-                noise_seed=noise_seed,
-                output_meds_dir=self.output_meds_dir,
-                galaxy_src_func=galaxy_src_func,
-                star_src_func = star_src_func,
-                gal_kws = self.gal_kws))
+            if self.gal_kws.get('galaxies', True):
+                jobs.append(joblib.delayed(_render_se_image)(
+                    se_info=se_info,
+                    band=band,
+                    galaxy_truth_cat=self.galaxy_truth_catalog,
+                    star_truth_cat=self.star_truth_catalog,
+                    bounds_buffer_uv=self.bounds_buffer_uv,
+                    draw_method=self.draw_method,
+                    noise_seed=noise_seed,
+                    output_meds_dir=self.output_meds_dir,
+                    galaxy_src_func=galaxy_src_func,
+                    star_src_func = star_src_func,
+                    gal_kws = self.gal_kws))
+            
+            else:
+                print("NO OBJECTS SIMULATED")
+                jobs.append(joblib.delayed(_move_se_img_wgt_bkg)(se_info=se_info, output_meds_dir=self.output_meds_dir))
 
-        with joblib.Parallel(
-                n_jobs=-1, backend='loky', verbose=50, max_nbytes=None) as p:
+        #Have to do single threaded, cause dwarves are large objects (100s of arcsec)
+        #so it is highly memory intensive to draw in galsim, on DECam images.
+        with joblib.Parallel(n_jobs=1, backend='loky', verbose=50, max_nbytes=None) as p:
             p(jobs)
 
     def _make_psf_wrapper(self, *, se_info):
@@ -219,7 +225,7 @@ class End2EndSimulation(object):
         
         
         #Find which dwarfs we will inject and subsample just the handful we need for this coadd
-        mask_dwarf = self.simulated_catalog.cat['ISDWARF'] == True
+        mask_dwarf = self.simulated_catalog.cat['ISDIFFUSE'] == True
         inds_dwarf = self.dwarfsource_rng.choice(np.where(mask_dwarf)[0], len(ra_dwarf))
         
         #Positions and inds. The ind column also doubles as "DWARF or STAR" column since we can use it
@@ -308,7 +314,7 @@ class End2EndSimulation(object):
         truth_cat['x']   = x
         truth_cat['y']   = y
         
-        truth_cat['ID'] = self.simulated_catalog.cat['ID'][truth_cat['ind']]
+        truth_cat['ID']  = self.simulated_catalog.cat['ID'][truth_cat['ind']]
         
         if self.gal_kws['extinction'] == True:
             
@@ -616,26 +622,22 @@ class LazySourceCat(object):
             dec = self.truth_cat['dec'][ind] * galsim.degrees))
         
         
-        obj = get_desdf_galaxy(desdf_ind = self.truth_cat['ind'][ind],
-                                rng  = self.galsource_rng, 
-                                data = self.simulated_catalog,
-                                band = self.band)
+        obj = get_dwarf_object(ind  = self.truth_cat['ind'][ind],
+                               rng  = self.dwarfsource_rng, 
+                               data = self.simulated_catalog,
+                               band = self.band)
 
-        if self.gal_mag != 'custom':
-            normalized_flux = 10**((30 - self.gal_mag)/2.5)
-            obj = obj.withFlux(normalized_flux)
-            
         #Now do extinction (the coefficients are just zero if we didnt set gal_kws['extinction'] = True)
         A_mag  = self.truth_cat[ind]['A%s' % self.band]
         A_flux = 10**(-A_mag/2.5)
         obj    = obj.withScaledFlux(A_flux)
         
         #Now psf
-        psf = self.psf.getPSF(image_pos=pos)
+        psf = self.psf.getPSF(image_pos = pos)
         obj = galsim.Convolve([obj, psf], gsparams = Our_params)
         
         #For doing photon counting, need to do some silly work
-        rng = galsim.BaseDeviate(self.galsource_rng.randint(0, 2**32))
+        rng = galsim.BaseDeviate(self.dwarfsource_rng.randint(0, 2**32))
         
         return (obj, rng), pos
     

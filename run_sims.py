@@ -14,6 +14,7 @@ from srcextracting import MakeSrcExtractorCat
 from true_detecting import make_true_detections
 from medsing import make_meds_files
 from run_metacal import run_metacal
+from fitvding import MakeShredxCats, MakeFitvdCats
 from matching import match_catalogs
 from finalizing import finalize_files
 from initializing import initialize_files
@@ -208,6 +209,40 @@ def metacal(tilename, bands, output_desdata, seed, metacal_config_file):
         bands=[b for b in bands],
         seed=seed,
         mcal_config=mcal_config)
+    
+    
+@cli.command()
+@click.option('--tilename', type=str, required=True,
+              help='the coadd tile to simulate')
+@click.option('--bands', type=str, required=True,
+              help=('a list of bands to simulate as '
+                    'a concatnated string (e.g., "riz")'))
+@click.option('--output-desdata', type=str, required=True,
+              help='the output DESDATA directory')
+@click.option('--seed', type=int, required=True,
+              help='the base RNG seed')
+@click.option('--fitvd-config-file', type=str, required=True,
+              help='the YAML config file for fitvd run')
+@click.option('--shredx-config-file', type=str, required=True,
+              help='the YAML config file for shredx run')
+@click.option('--config-file', type=str, required=True,
+              help='the YAML config file')
+def fitvd(tilename, bands, output_desdata, seed, config_file, fitvd_config_file, shredx_config_file):
+    
+    with open(fitvd_config_file, 'r') as fp:
+        Shredx = MakeShredxCats(output_meds_dir=output_desdata,
+                                tilename=tilename,
+                                bands=[b for b in bands],
+                                config=config)
+        Shredx.run()
+        
+        
+        Fitvd = MakeFitvdCats(output_meds_dir=output_desdata,
+                              tilename=tilename,
+                              bands=[b for b in bands],
+                              config=config)
+        
+        Fitvd.run()
 
 
 @cli.command()

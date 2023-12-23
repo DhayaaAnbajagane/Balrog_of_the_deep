@@ -15,7 +15,7 @@ class MakeShredxCats(object):
     Class to create shredx files from MEDS
     """
     
-    def __init__(self, *, tilename, bands, output_meds_dir, config):
+    def __init__(self, *, tilename, bands, output_meds_dir, config, shredx_config_path):
         
         self.output_meds_dir = output_meds_dir
         self.tilename = tilename
@@ -36,6 +36,7 @@ class MakeShredxCats(object):
         self.fof_path    = self.base_path + '/shredx_fofs.fits'
         self.shredx_path = self.base_path + '/shredx.fits'
         self.fitvd_path  = self.base_path + '/fitvd.fits'
+        self.config_path = shredx_config_path
         
     
     def run(self):
@@ -115,7 +116,7 @@ class MakeShredxCats(object):
                     'END' : end,
                     'COADD_IMAGES' : " ".join([self.files['coadd'][b] for b in bands]),
                     'COADD_PSFS' : " ".join([self.files['psf'][b] for b in bands]),
-                    'CONFIG' : ,
+                    'CONFIG' : self.config_path,
                     'OUTFILE' : shredx_chunk_path,
                     'SEGMAP_PATH' : self.files['segmap']['i'] #Y6 uses i-band here so I do the same
                    }
@@ -174,7 +175,7 @@ class MakeFitvdCats(object):
     Class to create fitvd files from MEDS
     """
     
-    def __init__(self, *, tilename, bands, output_meds_dir, config):
+    def __init__(self, *, tilename, bands, output_meds_dir, config, fitvd_config_path):
         
         self.output_meds_dir = output_meds_dir
         self.tilename = tilename
@@ -195,6 +196,7 @@ class MakeFitvdCats(object):
         self.fof_path    = self.base_path + '/shredx_fofs.fits'
         self.shredx_path = self.base_path + '/shredx.fits'
         self.fitvd_path  = self.base_path + '/fitvd.fits'
+        self.config_path = fitvd_config_path
     
     
     def run(self):
@@ -263,7 +265,7 @@ class MakeFitvdCats(object):
             
             args = {'START' : start,
                     'END' : end,
-                    'CONFIG' : ,
+                    'CONFIG' : self.config_path,
                     'OUTPUT' : fitvd_chunk_path,
                     'SHREDX_PATH' : self.shredx_path,
                     'MEDS_PATHS' : " ".join([self.files['meds'][b] for b in bands])
@@ -317,234 +319,4 @@ class MakeFitvdCats(object):
         print("FINISHED CLEANING FOF FILES and FITVD CHUNKS")
         
         
-
-
-
-            
-            
-'''
-# Want to chunk up individual tiles to run on 128 cores on Perlmutter
-
-import multiprocessing as mp
-from multiprocessing import Pool
-import subprocess
-import os
-import argparse
-from astropy.io import fits
-from astropy.table import QTable
-from astropy.table import vstack
-import numpy as np
-
-n_cpu = 120
-
-parser = argparse.ArgumentParser(description='')
-parser.add_argument("-t", '--tile', type=str, help='A tile')
-args = parser.parse_args()
-
-base_dir = os.environ['PSCRATCH'] + "/BalrogY6/Y6Running_NERSC/"
-tilename = args.tile
-fitvd_path = "fitvd"
-    
-    
-
-
-tile_ext = tilename + "_" + req_num
-shredx_fofslist = "fitvd/" + tile_ext + "_shredx-fofslist.fits"
-
-
-#print(req_num)
-#print(segmap_path)
-#print(scat_path)
-#print(coaddimage_paths)
-#print(psfcat_paths)
-#print(meds_paths)
-
-    
-    
-def get_fofs_chunks(fofs_path):
-    
-    # Chunk up the fofs groups:
-    with fits.open(fofs_path) as hdul:
-        fofs = hdul[1].data
-    n_fofs = len(np.unique(fofs['fof_id'])) 
-
-    print("fof groups: ", n_fofs)
-
-    n_chunks = n_cpu
-    n_objs_chunks = n_fofs // n_chunks
-
-    print("n_chunks : ", n_chunks)
-    print("n_objs_chunks : ", n_objs_chunks)
-
-    starts_ends = []
-    for i in range(n_chunks):
-        start = i*n_objs_chunks
-        end = i*n_objs_chunks + n_objs_chunks - 1
-        if i == n_chunks-1:
-            end = n_fofs - 1
-        starts_ends.append((start, end))
-    
-    return starts_ends
-    
-
-    
-def get_fitvd_chunks(shredx_fits_path):
-    
-    with fits.open(shredx_fits_path) as hdul:
-        shredx = hdul[1].data
-    n_objs = len(shredx) 
-    
-    n_chunks = n_cpu
-    n_objs_chunks = n_objs // n_chunks
-    
-    starts_ends = []
-    for i in range(n_chunks):
-        start = i*n_objs_chunks
-        end = i*n_objs_chunks + n_objs_chunks - 1
-        if i == n_chunks-1:
-            end = n_objs - 1
-        starts_ends.append((start, end))
-    
-    return starts_ends       
-    
         
-    
-def run_make_fofs():
-    
-    # Not in parallel:
-    fof_command = "shredx-make-fofs --output " + shredx_fofslist + " --seg " + segmap_path
-
-    print(fof_command)
-    print(shredx_fofslist)
-    print(segmap_path)
-    
-    print(os.path.join(base_dir, tilename))
-    print(fof_command)
-    
-    command = "cd " + os.path.join(base_dir, tilename) + "; " + fof_command
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = process.communicate()
-    print(stdout, stderr)
-
-    return os.path.join(base_dir, tilename, shredx_fofslist)
-    
-
-# Old random seed: 206492073
-def run_shredx(start, end):
-    
-    shredx_chunklist = "fitvd/" + tile_ext + "_shredx-chunk-" + str(start) + "-" + str(end) + ".fits"
-    sof_output = "fitvd/" + tile_ext + "_sof-chunk-" + str(start) + "-" + str(end) + ".fits"
-    
-    shredx_command = ("shredx --cat " + scat_path + " --start " + str(start) + " --end " + str(end) + " --seed 206492073" +
-                  " --images " + coaddimage_paths[0] + " " + coaddimage_paths[1] + " " + coaddimage_paths[2] + " " + coaddimage_paths[3] + 
-                  " --psf " + psfcat_paths[0] + " " + psfcat_paths[1] + " " + psfcat_paths[2] + " " + psfcat_paths[3] + 
-                  " --fofs " + shredx_fofslist + " --config %s/BalrogY6/inputs/Y6A1_v1_shredx-Y6A1v1.yaml " % os.environ['HOME'] + 
-                  "--outfile " + shredx_chunklist + " --seg " + segmap_path)
-    
-    command = "cd " + os.path.join(base_dir, tilename) + "; " + shredx_command
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = process.communicate()
-    
-    return stdout, stderr
-
-
-# new seed: 234324
-# Old random seed: 401349271
-def run_fitvd(start, end):
-    
-    shredx_fits = tile_ext + "_shredx.fits"
-    sof_output = "fitvd/" + tile_ext + "_sof-chunk-" + str(start) + "-" + str(end) + ".fits"
-    
-    fitvd_command = ("fitvd --start " + str(start) + " --end " + str(end) + " --seed 401349271" +
-                 " --config %s/BalrogY6/inputs/Y6A1_v1_fitvd-Y6A1v5.yaml"  % os.environ['HOME'] + 
-                 " --model-pars " + shredx_fits + 
-                 " --output " + sof_output + 
-                 " " + meds_paths[0] + " " + meds_paths[1] + " " + meds_paths[2] + " " + meds_paths[3])
-    
-    command = "cd " + os.path.join(base_dir, tilename) + "; " + fitvd_command
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = process.communicate()
-    
-    return stdout, stderr
-
-
-
-def join_shred_chunks():
-    full_shred = QTable()
-    for file in os.listdir(os.path.join(base_dir, tilename, fitvd_path)):
-        if file[:34] == tile_ext + "_shredx-chunk":
-
-            file_path = os.path.join(base_dir, tilename, fitvd_path, file)
-            with fits.open(file_path) as hdul:
-                data = hdul[1].data
-
-            data = QTable(data)
-
-            full_shred = vstack([full_shred, data])
-            data = None
-
-    file_name = tile_ext + "_shredx.fits"
-    full_shred.write(os.path.join(base_dir, tilename, fitvd_path, file_name), overwrite=True)
-    
-    return os.path.join(base_dir, tilename, fitvd_path, file_name)
-    
-
-def join_sof_chunks():
-    
-    filelist = []
-    file_name = tile_ext + "_sof.fits"
-    output = os.path.join(base_dir, tilename, file_name)
-    
-    for file in os.listdir(os.path.join(base_dir, tilename, fitvd_path)):
-        if tile_ext + "_sof-chunk" in file:
-            file_path = os.path.join(base_dir, tilename, fitvd_path, file)
-            
-            filelist.append(file_path)
-            
-            print(file_path)
-    
-    fitvd_command = ("fitvd-collate --meds " + meds_paths[0] + " --output " + output + " " + " ".join(filelist))
-    
-    print(fitvd_command)
-    command = "cd " + os.path.join(base_dir, tilename) + ";" + fitvd_command
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = process.communicate()
-    
-    print(stdout, stderr)
-    return stdout, stderr
-
-    
-    
-
-
-if __name__ == '__main__':
-    
-    # Make the fofs groups:
-    shredx_fofslist = run_make_fofs()
-    
-    # Chunk the fofs groups for shredx:
-    starts_ends = get_fofs_chunks(shredx_fofslist)
-    
-    # Run the groups through the shredder:
-    with Pool(n_cpu+2) as p:
-        print(p.starmap(run_shredx, starts_ends))
-        p.close()
-        p.join()
-        
-    # Combine the shredx files into one fits:
-    shredx_fits_path = join_shred_chunks()
-    
-    # Chunk the objects for fitvd:
-    starts_ends = get_fitvd_chunks(shredx_fits_path)
-    
-    # Run fitvd on the Chunks:
-    with Pool(n_cpu+2) as p:
-        print(p.starmap(run_fitvd, starts_ends))
-        p.close()
-        p.join()   
-        
-    # Join the sof chunks together:
-    join_sof_chunks()
-        
-    print("Done with all")
-'''
