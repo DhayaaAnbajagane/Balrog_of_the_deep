@@ -80,9 +80,9 @@ def make_coadd_hexgrid_radec(*, radius, coadd_wcs, rng, return_xy=False):
     endx, endy = 10_000, 10_000
     
     #Put in buffer so we don't inject gals near the edge
-    #20 arcsec is 76 pix, so rounding to 100
+    #200 arcsec is 760 pix, so rounding to 800
     
-    buffer = 100
+    buffer = 800
     
     startx += buffer
     starty += buffer

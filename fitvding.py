@@ -45,7 +45,7 @@ class MakeShredxCats(object):
         self.make_fofs()
         self.run_shredx()
         self.collate_shredx()
-#         self.cleanup()
+        self.cleanup()
         
         print("FINISHED SHREDX")
     
@@ -211,7 +211,7 @@ class MakeFitvdCats(object):
         self.get_file_list()
         self.run_fitvd()
         self.collate_fitvd()
-#         self.cleanup()
+        self.cleanup()
         
         print("FINISHED FITVD")
     
