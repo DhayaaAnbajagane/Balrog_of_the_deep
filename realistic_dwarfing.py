@@ -20,15 +20,15 @@ Dwarf_data = collections.namedtuple(
 def init_dwarf_catalog(*, rng):
     
     fname = os.environ['CAT_PATH']
-    Dwarf_data = fitsio.read(fname)
+    Dwarf_cat = fitsio.read(fname)
     
     #If rng not supplied then don't do random rotation
     if rng is None:
         angle = None
     else:
-        angle = rng.uniform(low = 0, high = 1, size = len(DESDF_cat))*360
+        angle = rng.uniform(low = 0, high = 1, size = len(Dwarf_cat))*360
         
-    return (Dwarf_data, angle)
+    return Dwarf_data(Dwarf_cat, angle)
 
 
 def get_dwarf_object(*, ind, rng, data, band = None):
@@ -62,11 +62,11 @@ def get_dwarf_object(*, ind, rng, data, band = None):
     
     elif data.cat['ISDIFFUSE'][ind] == True:
     
-        hlr = data.cat['hlr'][ind]
-        e1  = data.cat['e1'][ind]
-        e2  = data.cat['e2'][ind]
+        hlr  = data.cat['hlr'][ind]
+        beta = data.cat['beta'][ind]
+        q    = data.cat['q'][ind]
         
-        prof  = galsim.Exponential(half_light_radius = hlr, flux = flux).shear(g1 = e1, g2 = e2)
+        prof  = galsim.Exponential(half_light_radius = hlr, flux = flux).shear(beta = beta * galsim.degrees, q = q)
         prof  = prof.rotate(data.rand_rot[ind]*galsim.degrees)
     
 

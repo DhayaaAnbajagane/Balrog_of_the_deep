@@ -7,18 +7,6 @@ import sys
 import click
 import yaml
 
-from band_infoing import make_band_info
-from simulating import End2EndSimulation
-from coadding import MakeSwarpCoadds
-from srcextracting import MakeSrcExtractorCat
-from true_detecting import make_true_detections
-from medsing import make_meds_files
-from run_metacal import run_metacal
-from fitvding import MakeShredxCats, MakeFitvdCats
-from matching import match_catalogs
-from finalizing import finalize_files
-from initializing import initialize_files
-
 
 @click.group()
 def cli():
@@ -37,6 +25,9 @@ def cli():
 @click.option('--config-file', type=str, required=True,
               help='the YAML config file')
 def initialize(tilename, bands, output_desdata, config_file):
+    
+    from initializing import initialize_files
+
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
     initialize_files(
@@ -59,6 +50,9 @@ def initialize(tilename, bands, output_desdata, config_file):
               help='the YAML config file')
 def prep(tilename, bands, output_desdata, n_files, config_file):
     """Prepare a tile for simulating."""
+    
+    from band_infoing import make_band_info
+    
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
     make_band_info(
@@ -81,6 +75,10 @@ def prep(tilename, bands, output_desdata, n_files, config_file):
 @click.option('--config-file', type=str, required=True,
               help='the YAML config file')
 def galsim(tilename, bands, output_desdata, seed, config_file):
+    
+    from simulating import End2EndSimulation
+    
+    
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
     sim = End2EndSimulation(
@@ -89,32 +87,9 @@ def galsim(tilename, bands, output_desdata, seed, config_file):
         tilename=tilename,
         bands=[b for b in bands],
         gal_kws=config['gal_kws'],
-        star_kws=config['star_kws'],
         psf_kws=config['psf_kws'])
     sim.run()
 
-
-@cli.command('true-detection')
-@click.option('--tilename', type=str, required=True,
-              help='the coadd tile to simulate')
-@click.option('--bands', type=str, required=True,
-              help=('a list of bands to run detection for as '
-                    'a concatnated string (e.g., "riz")'))
-@click.option('--output-desdata', type=str, required=True,
-              help='the output DESDATA directory')
-@click.option('--config-file', type=str, required=True,
-              help='the YAML config file')
-def true_detection(tilename, bands, output_desdata, config_file):
-    with open(config_file, 'r') as fp:
-        config = yaml.load(fp, Loader=yaml.Loader)
-        
-    if config['gal_kws']['truth_type'] in ['grid-truedet', 'random-truedet']:
-        make_true_detections(
-            tilename=tilename,
-            bands=[b for b in bands],
-            output_meds_dir=output_desdata,
-            box_size=config['true_detection']['box_size'],
-            config = config)
 
 
 @cli.command('swarp')
@@ -128,16 +103,18 @@ def true_detection(tilename, bands, output_desdata, config_file):
 @click.option('--config-file', type=str, required=True,
               help='the YAML config file')
 def swarp(tilename, bands, output_desdata, config_file):
+    
+    from coadding import MakeSwarpCoadds
+    
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
         
-    if config['gal_kws']['truth_type'] not in ['grid-truedet', 'random-truedet']:
-        coadd = MakeSwarpCoadds(
-            output_meds_dir=output_desdata,
-            tilename=tilename,
-            bands=[b for b in bands],
-            config=config)
-        coadd.run()
+    coadd = MakeSwarpCoadds(
+        output_meds_dir=output_desdata,
+        tilename=tilename,
+        bands=[b for b in bands],
+        config=config)
+    coadd.run()
 
 
 @cli.command('source-extractor')
@@ -151,16 +128,18 @@ def swarp(tilename, bands, output_desdata, config_file):
 @click.option('--config-file', type=str, required=True,
               help='the YAML config file')
 def source_extractor(tilename, bands, output_desdata, config_file):
+    
+    from srcextracting import MakeSrcExtractorCat
+    
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
         
-    if config['gal_kws']['truth_type'] not in ['grid-truedet', 'random-truedet']:
-        SrcExtractor = MakeSrcExtractorCat(
-                                    output_meds_dir=output_desdata,
-                                    tilename=tilename,
-                                    bands=[b for b in bands],
-                                    config=config)
-        SrcExtractor.run()
+    SrcExtractor = MakeSrcExtractorCat(
+                                output_meds_dir=output_desdata,
+                                tilename=tilename,
+                                bands=[b for b in bands],
+                                config=config)
+    SrcExtractor.run()
 
 
 @cli.command()
@@ -176,6 +155,9 @@ def source_extractor(tilename, bands, output_desdata, config_file):
 @click.option('--meds-config-file', type=str, required=True,
               help='the YAML config file for MEDS making')
 def meds(tilename, bands, output_desdata, config_file, meds_config_file):
+    
+    from medsing import make_meds_files
+    
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
     with open(meds_config_file, 'r') as fp:
@@ -201,6 +183,10 @@ def meds(tilename, bands, output_desdata, config_file, meds_config_file):
 @click.option('--metacal-config-file', type=str, required=True,
               help='the YAML config file for metacal run')
 def metacal(tilename, bands, output_desdata, seed, metacal_config_file):
+    
+    from run_metacal import run_metacal
+    
+    
     with open(metacal_config_file, 'r') as fp:
         mcal_config = yaml.load(fp, Loader=yaml.Loader)
     run_metacal(
@@ -229,20 +215,27 @@ def metacal(tilename, bands, output_desdata, seed, metacal_config_file):
               help='the YAML config file')
 def fitvd(tilename, bands, output_desdata, seed, config_file, fitvd_config_file, shredx_config_file):
     
-    with open(fitvd_config_file, 'r') as fp:
-        Shredx = MakeShredxCats(output_meds_dir=output_desdata,
-                                tilename=tilename,
-                                bands=[b for b in bands],
-                                config=config)
-        Shredx.run()
-        
-        
-        Fitvd = MakeFitvdCats(output_meds_dir=output_desdata,
-                              tilename=tilename,
-                              bands=[b for b in bands],
-                              config=config)
-        
-        Fitvd.run()
+    from fitvding import MakeShredxCats, MakeFitvdCats
+    
+    
+    with open(config_file, 'r') as fp:
+        config = yaml.load(fp, Loader=yaml.Loader)
+
+    Shredx = MakeShredxCats(output_meds_dir=output_desdata,
+                            tilename=tilename,
+                            bands=[b for b in bands],
+                            config=config,
+                            shredx_config_path = shredx_config_file)
+    Shredx.run()
+
+
+    Fitvd = MakeFitvdCats(output_meds_dir=output_desdata,
+                          tilename=tilename,
+                          bands=[b for b in bands],
+                          config=config,
+                          fitvd_config_path = fitvd_config_file)
+
+    Fitvd.run()
 
 
 @cli.command()
@@ -256,6 +249,9 @@ def fitvd(tilename, bands, output_desdata, seed, config_file, fitvd_config_file,
 @click.option('--config-file', type=str, required=True,
               help='the YAML config file')
 def match(tilename, bands, output_desdata, config_file):
+    
+    from matching import match_catalogs
+    
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
     match_catalogs(
@@ -276,6 +272,9 @@ def match(tilename, bands, output_desdata, config_file):
 @click.option('--config-file', type=str, required=True,
               help='the YAML config file')
 def finalize(tilename, bands, output_desdata, config_file):
+    
+    from finalizing import finalize_files
+    
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
     finalize_files(

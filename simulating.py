@@ -10,6 +10,7 @@ import galsim
 import fitsio
 import healpy as hp #Needed to read extinction map
 from esutil.ostools import StagedOutFile
+from tqdm import tqdm
 
 from files import (
     get_band_info_file,
@@ -22,7 +23,7 @@ from sky_bounding import get_rough_sky_bounds, radec_to_uv
 from wcsing import get_esutil_wcs, get_galsim_wcs
 from galsiming import render_sources_for_image, Our_params
 from psf_wrapper import PSFWrapper
-from realistic_dwarfing import init_dwarf_catalog
+from realistic_dwarfing import init_dwarf_catalog, get_dwarf_object
 from coadding import MakeSwarpCoadds
 
 logger = logging.getLogger(__name__)
@@ -132,16 +133,15 @@ class End2EndSimulation(object):
             low=1, high=2**30, size=len(self.info[band]['src_info']))
         
         jobs = []
-        for noise_seed, se_info in zip(
-                noise_seeds, self.info[band]['src_info']):
-
-             src_func = LazySourceCat(
+        for noise_seed, se_info in zip(noise_seeds, self.info[band]['src_info']):
+            
+            src_func = LazySourceCat(
                 truth_cat=self.truth_catalog,
                 wcs=get_galsim_wcs(
                     image_path=se_info['image_path'],
                     image_ext=se_info['image_ext']),
                 psf=self._make_psf_wrapper(se_info=se_info),
-                source_rng = self.dwarfsource_rng,
+                dwarfsource_rng = self.dwarfsource_rng,
                 simulated_catalog = self.simulated_catalog,
                 band = band)
             
@@ -149,23 +149,20 @@ class End2EndSimulation(object):
                 jobs.append(joblib.delayed(_render_se_image)(
                     se_info=se_info,
                     band=band,
-                    galaxy_truth_cat=self.galaxy_truth_catalog,
-                    star_truth_cat=self.star_truth_catalog,
+                    truth_cat=self.truth_catalog,
                     bounds_buffer_uv=self.bounds_buffer_uv,
                     draw_method=self.draw_method,
                     noise_seed=noise_seed,
                     output_meds_dir=self.output_meds_dir,
-                    galaxy_src_func=galaxy_src_func,
-                    star_src_func = star_src_func,
+                    src_func=src_func,
                     gal_kws = self.gal_kws))
-            
             else:
                 print("NO OBJECTS SIMULATED")
                 jobs.append(joblib.delayed(_move_se_img_wgt_bkg)(se_info=se_info, output_meds_dir=self.output_meds_dir))
 
         #Have to do single threaded, cause dwarves are large objects (100s of arcsec)
         #so it is highly memory intensive to draw in galsim, on DECam images.
-        with joblib.Parallel(n_jobs=1, backend='loky', verbose=50, max_nbytes=None) as p:
+        with joblib.Parallel(n_jobs=40, backend='loky', verbose=50, max_nbytes=None) as p:
             p(jobs)
 
     def _make_psf_wrapper(self, *, se_info):
@@ -215,13 +212,13 @@ class End2EndSimulation(object):
             bit_mask = fitsio.read(self.info[band]['bmask_path'],  ext = self.info[band]['bmask_ext'])
             wgt      = fitsio.read(self.info[band]['weight_path'], ext = self.info[band]['weight_ext'])
 
-            gal_mask = bit_mask[y.astype(int), x.astype(int)] == 0 #only select objects whose centers are unmasked
-            gal_mask = gal_mask & (wgt[y.astype(int), x.astype(int)] != 0) #Do same thing but for wgt != 0 (nwgint sets wgt == 0 in some places)
+            gal_mask = bit_mask[y_dwarf.astype(int), x_dwarf.astype(int)] == 0 #only select objects whose centers are unmasked
+            gal_mask = gal_mask & (wgt[y_dwarf.astype(int), x_dwarf.astype(int)] != 0) #Do same thing but for wgt != 0 (nwgint sets wgt == 0 in some places)
 
             ra_dwarf, dec_dwarf = ra_dwarf[gal_mask], dec_dwarf[gal_mask]
             x_dwarf,  y_dwarf   = x_dwarf[gal_mask],  y_dwarf[gal_mask]
         
-        print("TRUTH CATALOG HAS %d OBJECTS" % len(x))
+        print("TRUTH CATALOG HAS %d OBJECTS" % len(x_dwarf))
         
         
         #Find which dwarfs we will inject and subsample just the handful we need for this coadd
@@ -233,7 +230,7 @@ class End2EndSimulation(object):
         ra, dec, x, y, inds = [], [], [], [], []
         
         #Loop over each dwarf and build its ra and dec
-        for d_i in range(len(ra_dwarf)):
+        for d_i in tqdm(range(len(ra_dwarf)), desc = 'Building Truth catalog'):
             
             ind = inds_dwarf[d_i] #Find dwarf ind
             
@@ -244,52 +241,56 @@ class End2EndSimulation(object):
             x    += [x_dwarf[d_i]]
             y    += [y_dwarf[d_i]]
             
-            inds_star = np.where(self.simulated_catalog.cat['PARENT_ID'] == ind)[0] #Find all stars associated with this
-            
+            dwarf_id = self.simulated_catalog.cat['PARENT_ID'][ind]
+            inds_stars = np.where(self.simulated_catalog.cat['PARENT_ID'] == dwarf_id)[0] #Find all stars associated with this
+            Nstars   = len(inds_stars)
             #Get properties of the dwarf
-            e1, e2 = self.simulated_catalog.cat['e1'][ind], self.simulated_catalog.cat['e2'][ind]
+            beta   = self.simulated_catalog.cat['beta'][ind]
+            q      = self.simulated_catalog.cat['q'][ind]
             hlr    = self.simulated_catalog.cat['hlr'][ind]
-            r0     = hlr / 1.6783469900166605 #Convert from hlr to scale radius of exponential
+            r0     = hlr / 1.6783469900166605/0.263 #Convert from hlr to scale radius of exponential, and in pixel units
             ang    = self.simulated_catalog.rand_rot[ind] * np.pi/180 #put it in radians
             
-            for s_i in inds_stars:
-                
+            
+            if True:
                 #Find star position using analytical inversion. We sample uniform dist. and convert to exponential dist.
-                r = -r0 * np.log(1 - self.dwarfsource_rng.uniform(1e-16, 1)) #Use min != 0 else you will get r = infty error
-                r = np.clip(r, 0, 4*hlr) #Prevent rare chances that star is placed crazy far away from the galaxy.
-                
+                r = -r0 * np.log(1 - self.dwarfsource_rng.uniform(1e-16, 1 - 1e-4, Nstars)) #Use min != 0 else you will get r = infty error
+                r = np.clip(r, 0, 5*hlr/0.263) #Prevent rare chances that star is placed crazy far away from the galaxy.
+
                 #Get the x, y of the star. THIS IS W.R.T to galaxy. So x = 0 means center of dwarf. We will fix this later.
-                t = self.dwarfsource_rng.uniform(0, 2*np.pi) #Random angle. This is ang pos of star within galaxy
-                x_star, y_star = r * np.cos(t), np.sin(t)
-                
+                t = self.dwarfsource_rng.uniform(0, 2*np.pi, Nstars) #Random angle. This is ang pos of star within galaxy
+                x_tmp = r * np.cos(t)
+                y_tmp = r * np.sin(t)
+
                 #Now we change the position to account for galaxy ellipticity
-                jac = np.array([[1 - e1, -e2], [-e2, 1 + e1]])
-                
-                x_star, y_star = x * jac[0, 0] + y*jac[0, 1],  x * jac[1, 0] + y*jac[1, 1]
-                
+                jac = galsim.Shear(beta = beta * galsim.degrees, q = q).getMatrix()
+
+                x_star = x_tmp*jac[0, 0] + y_tmp*jac[0, 1]
+                y_star = x_tmp*jac[1, 0] + y_tmp*jac[1, 1]
+
                 #Finally, account for the new (random) galaxy rotation
                 x_star_final = + x_star * np.cos(ang) + y_star * np.sin(ang)
                 y_star_final = - x_star * np.sin(ang) + y_star * np.cos(ang)
-                
-                
+
+
                 #Okay, now that all the rotation transforms are done, 
                 #let's add back the host dwarf galaxy position (in image space)
                 x_star_final += x_dwarf[d_i]
                 y_star_final += y_dwarf[d_i]
-                
-                
+
+
                 #Also need to get the corresponding RA and DEC now (skycoord). We already loaded the coadd_wcs before.
                 #It's fine if a star goes "out of bounds" of coadd in x, y, ra, dec. We will remove out-of-bounds objs in later step
                 ra_star_final, dec_star_final = coadd_wcs.image2sky(x_star_final, y_star_final)
-                
-                
+
+
                 #Now just append everything to list of injection objects
-                inds += [inds_stars[s_i]]
-                ra   += [ra_star_final]
-                dec  += [dec_star_final]
-                x    += [x_star_final]
-                y    += [y_star_final]
-                
+                inds += list(inds_stars)
+                ra   += list(ra_star_final)
+                dec  += list(dec_star_final)
+                x    += list(x_star_final)
+                y    += list(y_star_final)
+            
         
         inds = np.array(inds)
         ra   = np.array(ra)
@@ -338,21 +339,24 @@ class End2EndSimulation(object):
 
         make_dirs_for_file(truth_cat_path)
         fitsio.write(truth_cat_path, truth_cat, clobber=True)
+        
+        print("TRUTH CATALOG WRITTEN")
 
         return truth_cat
+    
 
     def _make_sim_catalog(self):
         
         """Makes sim catalog"""
         
-        self.simulated_catalog = init_dwarf_catalog(rng = self.galsource_rng)
+        self.simulated_catalog = init_dwarf_catalog(rng = self.dwarfsource_rng)
             
         return self.simulated_catalog
 
 
 def _render_se_image(
-        *, se_info, band, galaxy_truth_cat, star_truth_cat, bounds_buffer_uv,
-        draw_method, noise_seed, output_meds_dir, galaxy_src_func, gal_kws, star_src_func):
+        *, se_info, band, truth_cat, bounds_buffer_uv,
+        draw_method, noise_seed, output_meds_dir, src_func, gal_kws):
     """Render an SE image.
 
     This function renders a full image and writes it to disk.
@@ -391,37 +395,19 @@ def _render_se_image(
 
     # step 1 - get the set of good objects for the CCD
     msk_inds = _cut_tuth_cat_to_se_image(
-        truth_cat=galaxy_truth_cat,
+        truth_cat=truth_cat,
         se_info=se_info,
         bounds_buffer_uv=bounds_buffer_uv)
 
     # step 2 - render the objects
     im = _render_all_objects(
         msk_inds=msk_inds,
-        truth_cat=galaxy_truth_cat,
+        truth_cat=truth_cat,
         se_info=se_info,
         band=band,
-        src_func=galaxy_src_func,
+        src_func=src_func,
         draw_method=draw_method)
     
-    # step 2b - render the star objects
-    if star_src_func is not None:
-        
-        msk_inds = _cut_tuth_cat_to_se_image(
-        truth_cat=star_truth_cat,
-        se_info=se_info,
-        bounds_buffer_uv=bounds_buffer_uv)
-        
-        star_im = _render_all_objects(
-                    msk_inds=msk_inds,
-                    truth_cat=star_truth_cat,
-                    se_info=se_info,
-                    band=band,
-                    src_func=star_src_func,
-                    draw_method=draw_method)
-        
-        im += star_im
-
     # step 3 - add bkg and noise
     # also removes the zero point
     im, wgt, bkg, bmask = _add_noise_mask_background(
@@ -482,12 +468,6 @@ def _add_noise_mask_background(*, image, se_info, noise_seed, gal_kws):
     # first back to ADU units
     image /= se_info['scale']
 
-    #If we want Blank image, then we can't add original image
-    if not gal_kws.get('BlankImage', False):
-        # take the original image and add the simulated + original images together
-        original_image = fitsio.read(se_info['nwgint_path'], ext=se_info['image_ext'])
-        image += original_image
-
     # now just read out these other images
     # in practice we just read out --> copy to other location
     # since balrog does not use wgt and bmask
@@ -495,9 +475,24 @@ def _add_noise_mask_background(*, image, se_info, noise_seed, gal_kws):
 #     wgt   = fitsio.read(se_info['weight_path'], ext=se_info['weight_ext'])
 #     bmask = fitsio.read(se_info['bmask_path'], ext=se_info['bmask_ext'])
 
-
     wgt   = fitsio.read(se_info['nwgint_path'], ext=se_info['weight_ext'])
     bmask = fitsio.read(se_info['nwgint_path'], ext=se_info['bmask_ext'])
+    
+    
+    #If we want Blank image, then we can't add original image
+    if not gal_kws.get('BlankImage', False):
+        # take the original image and add the simulated + original images together
+        original_image = fitsio.read(se_info['nwgint_path'], ext=se_info['image_ext'])
+        image += original_image
+
+    else:
+        
+        # add the background
+        image += bkg
+        
+        # now add noise
+        img_std = 1.0 / np.sqrt(np.median(wgt[bmask == 0]))
+        image += (noise_rng.normal(size=image.shape) * img_std)
     
     return image, wgt, bkg, bmask
 
@@ -601,17 +596,14 @@ class LazySourceCat(object):
         Returns the object to be rendered from the truth catalog at
         index `ind`.
     """
-    def __init__(self, *, truth_cat, wcs, psf, gal_mag, gal_source, band = None, galsource_rng = None, simulated_catalog = None):
+    def __init__(self, *, truth_cat, wcs, psf, band = None, dwarfsource_rng = None, simulated_catalog = None):
         self.truth_cat = truth_cat
         self.wcs = wcs
         self.psf = psf        
         
-        self.gal_source = gal_source
-        self.galsource_rng = galsource_rng
+        self.dwarfsource_rng = dwarfsource_rng
         
         self.simulated_catalog = simulated_catalog
-        
-        self.gal_mag = gal_mag
         self.band    = band
         
             
@@ -636,96 +628,7 @@ class LazySourceCat(object):
         psf = self.psf.getPSF(image_pos = pos)
         obj = galsim.Convolve([obj, psf], gsparams = Our_params)
         
-        #For doing photon counting, need to do some silly work
-        rng = galsim.BaseDeviate(self.dwarfsource_rng.randint(0, 2**32))
+        #For doing photon counting, need to do some workaround
+        rng = galsim.BaseDeviate(self.dwarfsource_rng.randint(0, 2**16))
         
         return (obj, rng), pos
-    
-    
-class LazyStarSourceCat(object):
-    """A lazy source catalog that only builds objects to be rendered as they
-    are needed. But now just for stars.
-
-    Parameters
-    ----------
-    truth_cat : structured np.array
-        The truth catalog as a structured numpy array.
-    wcs : galsim.GSFitsWCS
-        A galsim WCS instance for the image to be rendered.
-    psf : PSFWrapper
-        A PSF wrapper object to use for the PSF.
-    g1 : float
-        The shear to apply on the 1-axis.
-    g2 : float
-        The shear to apply on the 2-axis.
-
-    Methods
-    -------
-    __call__(ind)
-        Returns the object to be rendered from the truth catalog at
-        index `ind`.
-    """
-    def __init__(self, *, truth_cat, wcs, psf, star_mag, star_source, starsource_rng = None, band = None, simulated_catalog = None):
-        
-        self.truth_cat = truth_cat
-        self.wcs = wcs
-        self.psf = psf
-        
-        self.star_source = star_source
-        
-        self.simulated_catalog = simulated_catalog
-        
-        self.star_mag  = star_mag
-        self.band      = band
-        
-        self.starsource_rng = starsource_rng
-            
-
-    def __call__(self, ind):
-        
-        pos = self.wcs.toImage(galsim.CelestialCoord(ra  = self.truth_cat['ra'][ind]  * galsim.degrees,
-                                                     dec = self.truth_cat['dec'][ind] * galsim.degrees))
-        
-        
-        if self.star_mag == 'custom':
-            mag = self.simulated_catalog['mag_%s'%self.band][ind]
-        else:
-            mag = self.star_mag
-
-        normalized_flux = 10**((30 - mag)/2.5)
-
-        #No extinction correction since the catalog (LSST sim) already has this included
-        
-        #Just PSF since stars ARE the point source
-        obj = self.psf.getPSF(image_pos = pos).withFlux(normalized_flux)
-        
-        return obj, pos
-
-    
-
-def mock_balrog_sigmoid(mag_ref, sigmoid_x0, rng):
-    """
-    
-    Function for selecting deep field galaxies at a rate that follows a sigmoid function that smoothly transitions from 1 for bright objects, to a value of 0 for faint objects. 
-    Parameters
-    ----------
-    deep_data : pandas dataframe
-        Pandas dataframe containing the deep field data.
-    sigmoid_x0 : float
-        Magnitude value at which the sigmoid function transitions from 1 to 0.
-    N : int
-        Number of galaxies to be drawn.
-    ref_mag_col : string
-        Column name of the reference magnitude in deep_data
-    Returns
-    -------
-    deep_balrog_selection : pandas dataframe
-        Pandas dataframe containing a list of N deep field objects to be injected by Balrog.
-    """
-
-    weights = 1.0 - 1.0 / (1.0 + np.exp(-4.0 * (mag_ref - sigmoid_x0)))
-    weights /= np.sum(weights) #Need to normalize ourselves since numpy choice doesn't do this
-
-    inds = rng.choice(len(mag_ref), len(mag_ref), p = weights, replace = True)
-    
-    return inds

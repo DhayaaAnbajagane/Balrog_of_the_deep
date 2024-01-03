@@ -1,0 +1,11 @@
+name: des-y6-fitvd
+channels:
+- conda-forge
+- default
+dependencies:
+- des-fitvd
+- shredx
+- numpy=1.23.5
+- joblib
+- tqdm
+- click

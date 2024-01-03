@@ -21,6 +21,7 @@ export ROWE_STATS_DIR=/scratch/midway2/dhayaa/TEMP
 
 #PATH for files
 export EBV_PATH=/project/chihway/dhayaa/DECADE/Imsim_Inputs/ebv_sfd98_fullres_nside_4096_ring_equatorial.fits
+export CAT_PATH=/project/chihway/dhayaa/DECADE/Jonah_files/TMP.fits
 export CATSIM_PATH=/project/chihway/dhayaa/DECADE/Imsim_Inputs/OneDegSq.fits
 export CATCOSMOS_PATH=/project/chihway/dhayaa/DECADE/Imsim_Inputs/input_cosmos_v4.fits
 export CATDESDF_PATH=/project/chihway/dhayaa/DECADE/Imsim_Inputs/DESY3_Deepfields_V2BalrogCuts.fits
