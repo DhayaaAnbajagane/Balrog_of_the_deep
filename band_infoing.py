@@ -50,6 +50,8 @@ def make_band_info(*, tilename, bands, output_meds_dir, config, n_files=None):
         cfg['campaign'] = 'Y3A1_COADD'
     elif config['name'] == 'DECADE':
         cfg['campaign'] = 'DR3_1'
+    else:
+        cfg['campaign'] = config['name']
     
     fnames = {}
     for band in bands:
