@@ -334,10 +334,13 @@ class MakeSwarpCoadds(object):
         #Get header from original coadd to get center in RA and DEC
         header = fitsio.read_header(self.info[self.bands[0]]['image_path'], ext = 1)
 
+        det_bands = "gri"
+        
+        assert np.sum([d in self.bands for d in det_bands]) == len(det_bands), "We need detection bands %s"%det_bands
 
-        sci_paths = ['%s_sci.fits'%self.info[b]['image_path'].replace(TMP_DIR, self.output_meds_dir).replace('.fits.fz', '') for b in self.bands]
-        wgt_paths = ['%s_wgt.fits'%self.info[b]['image_path'].replace(TMP_DIR, self.output_meds_dir).replace('.fits.fz', '') for b in self.bands]
-        msk_paths = ['%s_msk.fits'%self.info[b]['image_path'].replace(TMP_DIR, self.output_meds_dir).replace('.fits.fz', '') for b in self.bands]
+        sci_paths = ['%s_sci.fits'%self.info[b]['image_path'].replace(TMP_DIR, self.output_meds_dir).replace('.fits.fz', '') for b in det_bands]
+        wgt_paths = ['%s_wgt.fits'%self.info[b]['image_path'].replace(TMP_DIR, self.output_meds_dir).replace('.fits.fz', '') for b in det_bands]
+        msk_paths = ['%s_msk.fits'%self.info[b]['image_path'].replace(TMP_DIR, self.output_meds_dir).replace('.fits.fz', '') for b in det_bands]
         
         
         args = {
