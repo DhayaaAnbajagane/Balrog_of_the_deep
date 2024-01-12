@@ -1,0 +1,5 @@
+eups list -D sextractor 2.24.4+0
+sextractor                               2.24.4+0
+|openblas                                0.2.19+2
+|fftw                                    3.3.2+5
+|implicitProducts                        None
