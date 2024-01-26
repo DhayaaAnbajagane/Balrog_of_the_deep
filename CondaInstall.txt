@@ -1,0 +1,36 @@
+========================================================================================
+LATEST INSTALLATION VERSION
+========================================================================================
+1.
+    conda create -n shearDM
+    conda activate shearDM
+    conda install conda
+
+2. 
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install -c conda-forge des-pixcorrect #des-fitvd shredx
+
+3. 
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install -c conda-forge pandas matplotlib scipy numpy cython
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install numba -c numba
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install h5py -c anaconda
+
+4. 
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install galsim ngmix -c conda-forge
+
+5.
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install jinja2 tqdm click joblib fitsio -c conda-forge
+
+6. 
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install -c conda-forge oracle-instant-client des-easyaccess
+
+
+Additional commands to add env to Jupyter Notebook kernel
+
+7.
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install -c conda-forge jupyter
+    ipython kernel install --name "shearDM" --user
+
+To add treecorr for rowe stats runs:
+
+8. 
+    /home/dhayaa/.conda/envs/shearDM/condabin/conda install -c conda-forge treecorr
