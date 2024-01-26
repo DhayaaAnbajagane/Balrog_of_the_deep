@@ -1,4 +1,4 @@
-name: /project/chihway/dhayaa/MyEnvs_Midway2/shearDM
+name: shearDM
 channels:
   - defaults
 dependencies:
@@ -25,4 +25,3 @@ dependencies:
   - healpy
   - jupyter
   - ipython
-prefix: /project/chihway/dhayaa/MyEnvs_Midway2/shearDM
