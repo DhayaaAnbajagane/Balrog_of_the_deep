@@ -5,7 +5,7 @@ gal_kws:
   type: exp
   gal_mag: custom
   
-  BlankImage: True
+  BlankImage: False
 
   size_min: 0.01
   size_max: 100.0
