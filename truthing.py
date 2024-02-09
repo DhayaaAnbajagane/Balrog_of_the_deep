@@ -106,7 +106,7 @@ def make_coadd_hexgrid_radec(*, radius, coadd_wcs, rng, return_xy=False):
     s = np.shape(polygons)
     L = s[0]*s[1]
     pp = np.array(polygons).reshape(L,2)
-    c = np.vstack({tuple(row) for row in pp})
+    c = np.vstack([tuple(row) for row in pp])
     # Some of the redundant coordinates are offset by ~1e-10 pixels
     hexgrid = np.unique(c.round(decimals=6), axis=0)
 
