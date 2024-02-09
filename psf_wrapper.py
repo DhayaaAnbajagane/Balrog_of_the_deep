@@ -3,7 +3,6 @@ import galsim.des
 
 #from ..des_piff import DES_Piff
 from gauss_pix_psf import GaussPixPSF
-from nongauss_pix_psf import NonGaussPixPSF
 from galsim.des import DES_PSFEx
 from des_psfex import DES_PSFEx_Deconv
 from psfex_deconvolved import PSFEx_Deconv
@@ -83,9 +82,9 @@ class PSFWrapper(object):
         #    wcs = self.wcs.local(image_pos)
         #    return self.psf.getPSF(image_pos, wcs)
 
-        elif isinstance(self.psf, NonGaussPixPSF):
-            wcs = self.wcs.local(image_pos)
-            return self.psf.getPSF(image_pos, wcs)
+        #elif isinstance(self.psf, NonGaussPixPSF):
+        #    wcs = self.wcs.local(image_pos)
+        #    return self.psf.getPSF(image_pos, wcs)
         
         elif isinstance(self.psf, GaussPixPSF):
             wcs = self.wcs.local(image_pos)
