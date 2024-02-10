@@ -141,13 +141,15 @@ def make_meds_files(*, tilename, bands, output_meds_dir, psf_kws, meds_config):
                             pass
                     
             
-            except:
+            except Exception as e:
+                # Catch-all for any other exceptions not caught by the specific handlers above
                 print("MEDS FAILED. RETRYING")
+                print(f"Unexpected error: {e}")
 
             counter += 1
             
             if counter > 5:
-                print("COULD NOT MAKE MEDS AFTER 10 TRIES.....")
+                print("COULD NOT MAKE MEDS AFTER 5 TRIES.....")
                 break
 
 
