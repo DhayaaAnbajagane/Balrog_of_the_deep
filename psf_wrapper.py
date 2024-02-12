@@ -137,10 +137,10 @@ class PSFWrapper(object):
         #    psf_im = psf_at_pos.drawImage(
         #        wcs=wcs, nx=self.n_pix, ny=self.n_pix).array
  
-        elif isinstance(self.psf, NonGaussPixPSF):
-            psf_at_pos = self.psf.getPSF(im_pos, wcs)
-            psf_im = psf_at_pos.drawImage(
-                wcs=wcs, nx=self.n_pix, ny=self.n_pix).array      
+        #elif isinstance(self.psf, NonGaussPixPSF):
+        #    psf_at_pos = self.psf.getPSF(im_pos, wcs)
+        #    psf_im = psf_at_pos.drawImage(
+        #        wcs=wcs, nx=self.n_pix, ny=self.n_pix).array      
 
         elif isinstance(self.psf, GaussPixPSF):
             psf_at_pos = self.psf.getPSF(im_pos, wcs)
