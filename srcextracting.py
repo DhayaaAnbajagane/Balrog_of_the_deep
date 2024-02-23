@@ -41,7 +41,10 @@ class MakeSrcExtractorCat(object):
             coadd_file = self.info[band]['image_path'].replace(TMP_DIR, self.output_meds_dir).replace('.fz', '')
             seg_file   = self.info[band]['seg_path'].replace(TMP_DIR, self.output_meds_dir)
             cat_file   = self.info[band]['cat_path'].replace(TMP_DIR, self.output_meds_dir)
+            psf_file   = self.info[band]['psf_path'] #No need since we use the original coadd PSF here
             
+            #detection psf path needs minor hacking
+            det_psf_file = psf_file.replace('_%s_' % band, '_det_')
             make_dirs_for_file(cat_file)
             make_dirs_for_file(seg_file)
             
@@ -55,7 +58,9 @@ class MakeSrcExtractorCat(object):
                     'BAND'      : band,
                     'COADD'     : coadd_file,
                     'SEG'       : seg_file,
-                    'CAT'       : cat_file}
+                    'CAT'       : cat_file,
+                    'DET_PSF'   : det_psf_file,
+                    'PSF'       : psf_file}
 
 
             srcextractor_command = "$SRCEXT_DIR/src/sex \
@@ -63,11 +68,12 @@ class MakeSrcExtractorCat(object):
                                         -c $DESDM_CONFIG/Y6A1_v1_sex.config \
                                         -CHECKIMAGE_TYPE SEGMENTATION \
                                         -CHECKIMAGE_NAME %(SEG)s \
-                                        -PARAMETERS_NAME $DESDM_CONFIG/Y6A1_v1_srcex.param_diskonly_old \
+                                        -PARAMETERS_NAME $DESDM_CONFIG/Y6A1_v1_srcex.param_diskonly \
                                         -MAG_ZEROPOINT 30 \
                                         -FILTER_NAME $DESDM_CONFIG/Y6A1_v1_gauss_3.0_7x7.conv \
                                         -CATALOG_NAME %(CAT)s \
                                         -FLAG_IMAGE %(COADD)s[1] \
+                                        -PSF_NAME %(DET_PSF)s,%(PSF)s \
                                         -STARNNW_NAME $DESDM_CONFIG/Y6A1_v1_srcex.nnw \
                                         -WEIGHT_IMAGE %(DET_COADD)s[2],%(COADD)s[2] \
                                         -DEBLEND_MINCONT 0.001 \
