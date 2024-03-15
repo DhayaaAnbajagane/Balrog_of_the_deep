@@ -81,8 +81,12 @@ def make_coadd_hexgrid_radec(*, radius, coadd_wcs, rng, return_xy=False):
     
     #Put in buffer so we don't inject gals near the edge
     #200 arcsec is 760 pix, so rounding to 800
-    
     buffer = 800
+
+    #New version of buffer that depends on the radius used in code
+    #Unfortunate naming means "radius" is actually diameter of object
+    #We want the buffer to be the diameter though.
+    buffer = radius
     
     startx += buffer
     starty += buffer
