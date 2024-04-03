@@ -223,6 +223,7 @@ class End2EndSimulation(object):
         
         #Find which dwarfs we will inject and subsample just the handful we need for this coadd
         mask_dwarf = self.simulated_catalog.cat['ISDIFFUSE'] == True
+        mask_star  = self.simulated_catalog.cat['ISDIFFUSE'] == False
         inds_dwarf = self.dwarfsource_rng.choice(np.where(mask_dwarf)[0], len(ra_dwarf))
         
         #Positions and inds. The ind column also doubles as "DWARF or STAR" column since we can use it
@@ -242,7 +243,7 @@ class End2EndSimulation(object):
             y    += [y_dwarf[d_i]]
             
             dwarf_id = self.simulated_catalog.cat['PARENT_ID'][ind]
-            inds_stars = np.where(self.simulated_catalog.cat['PARENT_ID'] == dwarf_id)[0] #Find all stars associated with this
+            inds_stars = np.where( (self.simulated_catalog.cat['PARENT_ID'] == dwarf_id) & mask_star)[0] #Find all stars associated with this
             Nstars   = len(inds_stars)
             #Get properties of the dwarf
             beta   = self.simulated_catalog.cat['beta'][ind]

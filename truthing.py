@@ -119,7 +119,7 @@ def make_coadd_hexgrid_radec(*, radius, coadd_wcs, rng, return_xy=False):
     hexgrid[:, 1] += rng.uniform(low=-0.5, high=0.5, size = len(hexgrid))
     
     # Some hexagonal elements go beyond boundary; cut these out
-    indx = np.where( (hexgrid[:,0]<endx) & (hexgrid[:,1]<endy) )
+    indx = np.where( (hexgrid[:,0]<=endx) & (hexgrid[:,1]<=endy) )
     x, y = hexgrid[indx].T
     
     ra, dec = coadd_wcs.image2sky(x, y)
