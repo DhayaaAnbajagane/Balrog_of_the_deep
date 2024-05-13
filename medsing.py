@@ -50,7 +50,14 @@ def make_meds_files(*, tilename, bands, output_meds_dir, psf_kws, meds_config):
 
     # read info files
     info = {}
-    for band in bands:
+
+    #This is to include r-band just when pulling file info
+    #since we use the r-band truth catalog below.
+    #Rest of code uses only bands provided in $bands
+    #This allows meds to be running band-per-band as separate processes.
+    tmp_bands = bands if 'r' in bands else 'r' + bands
+
+    for band in tmp_bands:
         # get info about files
         fname = get_band_info_file(
             meds_dir=output_meds_dir,
