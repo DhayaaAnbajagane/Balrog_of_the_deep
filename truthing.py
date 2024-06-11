@@ -64,7 +64,7 @@ def make_coadd_hexgrid_radec(*, radius, coadd_wcs, rng, return_xy=False):
     Make a hexagonal grid. From Spencer's Y3 Balrog code.
     '''
     
-    r = radius
+    r = radius * 3/2 #We set radius to be 1.5 times the HLR
     p = r * np.tan(np.pi / 6.) # side length / 2
     h = 4. * p
     dx = 2. * r
@@ -79,14 +79,9 @@ def make_coadd_hexgrid_radec(*, radius, coadd_wcs, rng, return_xy=False):
     startx, starty = 0, 0
     endx, endy = 10_000, 10_000
     
-    #Put in buffer so we don't inject gals near the edge
-    #200 arcsec is 760 pix, so rounding to 800
-    buffer = 800
-
     #New version of buffer that depends on the radius used in code
-    #Unfortunate naming means "radius" is actually diameter of object
-    #We want the buffer to be the diameter though.
-    buffer = radius
+    #We set it to 1/5 times the HLR.
+    buffer = radius * 3/2
     
     startx += buffer
     starty += buffer

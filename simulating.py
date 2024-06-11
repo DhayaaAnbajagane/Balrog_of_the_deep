@@ -162,7 +162,7 @@ class End2EndSimulation(object):
 
         #Have to do single threaded, cause dwarves are large objects (100s of arcsec)
         #so it is highly memory intensive to draw in galsim, on DECam images.
-        with joblib.Parallel(n_jobs=40, backend='loky', verbose=50, max_nbytes=None) as p:
+        with joblib.Parallel(n_jobs = -1, backend='loky', verbose=50, max_nbytes=None) as p:
             p(jobs)
 
     def _make_psf_wrapper(self, *, se_info):
@@ -198,7 +198,7 @@ class End2EndSimulation(object):
             image_path=self.info[band]['image_path'],
             image_ext=self.info[band]['image_ext'])
 
-        radius = 2*self.gal_kws['size_max']/0.263 #Radius of largest galaxy in pixel units. Factor of 2 to prevent overlap
+        radius = self.gal_kws['size_max']/0.263 #Radius of largest galaxy in pixel units.
         
         #These are the positions of the GALAXIES. We'll do the stars ourselves.
         ra_dwarf, dec_dwarf, x_dwarf, y_dwarf = make_coadd_hexgrid_radec(radius = radius,
@@ -224,7 +224,21 @@ class End2EndSimulation(object):
         #Find which dwarfs we will inject and subsample just the handful we need for this coadd
         mask_dwarf = self.simulated_catalog.cat['ISDIFFUSE'] == True
         mask_star  = self.simulated_catalog.cat['ISDIFFUSE'] == False
-        inds_dwarf = self.dwarfsource_rng.choice(np.where(mask_dwarf)[0], len(ra_dwarf))
+        #inds_dwarf = self.dwarfsource_rng.choice(np.where(mask_dwarf)[0], len(ra_dwarf))
+        
+        
+        #Slightly more involved procedure that guarantees every dwarf is injected before we do a repeat
+        inds_dwarf = []
+        while len(inds_dwarf) < len(x_dwarf):
+            inds_dwarf.extend(
+                            self.dwarfsource_rng.choice(
+                                    np.where(mask_dwarf)[0], mask_dwarf.sum(), 
+                                    replace = False #We don't want to re-pick an object in this step. Only unique objects  
+                            )
+                        )
+            
+        inds_dwarf = np.array(inds_dwarf)[:len(x_dwarf)] #Limit to the first N objects that we need.
+        inds_dwarf = self.dwarfsource_rng.choice(inds_dwarf, len(inds_dwarf), replace = False) #Just shuffle inds so positions are shuffled
         
         #Positions and inds. The ind column also doubles as "DWARF or STAR" column since we can use it
         #to index into the simulated_catalog, which has this info.
