@@ -68,7 +68,7 @@ class MakeSrcExtractorCat(object):
                                         -c $DESDM_CONFIG/Y6A1_v1_sex.config \
                                         -CHECKIMAGE_TYPE SEGMENTATION \
                                         -CHECKIMAGE_NAME %(SEG)s \
-                                        -PARAMETERS_NAME $DESDM_CONFIG/Y6A1_v1_srcex.param_diskonly \
+                                        -PARAMETERS_NAME $DESDM_CONFIG/Y6A1_v1_srcex.param_diskonly_fast \
                                         -MAG_ZEROPOINT 30 \
                                         -FILTER_NAME $DESDM_CONFIG/Y6A1_v1_gauss_3.0_7x7.conv \
                                         -CATALOG_NAME %(CAT)s \
