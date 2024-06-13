@@ -140,6 +140,27 @@ def source_extractor(tilename, bands, output_desdata, config_file):
                                 bands=[b for b in bands],
                                 config=config)
     SrcExtractor.run()
+    
+    
+@cli.command('subselect')
+@click.option('--tilename', type=str, required=True,
+              help='the coadd tile to simulate')
+@click.option('--bands', type=str, required=True,
+              help=('a list of bands to prep for as '
+                    'a concatnated string (e.g., "riz")'))
+@click.option('--output-desdata', type=str, required=True,
+              help='the output DESDATA directory')
+@click.option('--radius', type=float, required=True,
+              help='the matching radius in arcmin')
+def subselect(radius, tilename, bands, output_desdata):
+    
+    from subselecting import keep_injected_only
+    
+    keep_injected_only(radius   = radius, 
+                       tilename = tilename, 
+                       bands    = bands,
+                       output_desdata = output_desdata, 
+                       )
 
 
 @cli.command()
@@ -221,12 +242,12 @@ def fitvd(tilename, bands, output_desdata, seed, config_file, fitvd_config_file,
     with open(config_file, 'r') as fp:
         config = yaml.load(fp, Loader=yaml.Loader)
 
-    Shredx = MakeShredxCats(output_meds_dir=output_desdata,
-                            tilename=tilename,
-                            bands=[b for b in bands],
-                            config=config,
-                            shredx_config_path = shredx_config_file)
-    Shredx.run()
+#     Shredx = MakeShredxCats(output_meds_dir=output_desdata,
+#                             tilename=tilename,
+#                             bands=[b for b in bands],
+#                             config=config,
+#                             shredx_config_path = shredx_config_file)
+#     Shredx.run()
 
 
     Fitvd = MakeFitvdCats(output_meds_dir=output_desdata,
