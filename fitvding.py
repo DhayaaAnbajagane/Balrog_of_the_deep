@@ -242,8 +242,8 @@ class MakeFitvdCats(object):
     def run_fitvd(self):
 
         # Chunk up the fofs groups:
-        shredx = fitsio.read(self.shredx_path)
-        n_objs = len(shredx)
+        srcex  = fitsio.read(self.files['srcext'][self.bands[0]]) #All bands have same detection catalog so this index is fine
+        n_objs = len(srcex)
 
         print("n_objs groups: ", n_objs)
 
@@ -281,11 +281,18 @@ class MakeFitvdCats(object):
             
             FITVD_COMMAND = "fitvd --start %(START)d \
                                    --end %(END)d \
-                                   --seed 42 \
+                                   --seed 401349271 \
                                    --config %(CONFIG)s \
-                                   --model-pars %(SHREDX_PATH)s \
                                    --output %(OUTPUT)s \
                                    %(MEDS_PATHS)s" % args
+            
+#             FITVD_COMMAND = "fitvd --start %(START)d \
+#                                    --end %(END)d \
+#                                    --seed 42 \
+#                                    --config %(CONFIG)s \
+#                                    --model-pars %(SHREDX_PATH)s \
+#                                    --output %(OUTPUT)s \
+#                                    %(MEDS_PATHS)s" % args
             
                 
             os.system(FITVD_COMMAND)
