@@ -269,7 +269,8 @@ class End2EndSimulation(object):
             
             if True:
                 #Find star position using analytical inversion. We sample uniform dist. and convert to exponential dist.
-                r = -r0 * np.log(1 - self.dwarfsource_rng.uniform(1e-16, 1 - 1e-4, Nstars)) #Use min != 0 else you will get r = infty error
+                #r = -r0 * np.log(1 - self.dwarfsource_rng.uniform(1e-16, 1 - 1e-4, Nstars)) #Use min != 0 else you will get r = infty error
+                r = self.dwarfsource_rng.gamma(2, scale = r0, size = Nstars) #P(r) = exp(-r/r0)*r which includes jacobian term.
                 r = np.clip(r, 0, 5*hlr/0.263) #Prevent rare chances that star is placed crazy far away from the galaxy.
 
                 #Get the x, y of the star. THIS IS W.R.T to galaxy. So x = 0 means center of dwarf. We will fix this later.
