@@ -68,6 +68,8 @@ class MakeSwarpCoadds(object):
             print("Creating nwgint images for %s band" % band)
             
             for src in self.info[band]['src_info']:
+
+                print("Creating nwgint image for path %s" % src['image_path'])
                 
                 args['IMAGE_PATH'] = src['image_path']#.replace(TMP_DIR, self.output_meds_dir) #Taking raw image first so don't need this
                 args['HEAD_PATH']  = src['head_path']
@@ -83,7 +85,6 @@ class MakeSwarpCoadds(object):
                                     -o %(OUT_PATH)s \
                                     --headfile %(HEAD_PATH)s \
                                     --max_cols 50  \
-                                    --v \
                                     --interp_mask TRAIL,BPM  \
                                     --invalid_mask EDGE \
                                     --null_mask BPM,BADAMP,EDGEBLEED,EDGE,CRAY,SSXTALK,STREAK,TRAIL  \
@@ -111,8 +112,10 @@ class MakeSwarpCoadds(object):
 #                                     --streak_file $DESDM_CONFIG/Y3A2_v5_streaks_update-Y1234_FINALCUT_v1.fits" % args
                 
                 os.system(pix_command)
+
+                print("FINISHED nwgint image for path %s" % src['image_path'])
                
-        
+        print("WE HAVE FINISHED ALL COADD_NWGINT-ING")
         return self.info
     
         
