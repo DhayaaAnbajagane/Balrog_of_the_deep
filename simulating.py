@@ -496,19 +496,28 @@ def _add_noise_mask_background(*, image, se_info, noise_seed, gal_kws):
     
     
     #If we want Blank image, then we can't add original image
-    if not gal_kws.get('BlankImage', False):
-        # take the original image and add the simulated + original images together
-        original_image = fitsio.read(se_info['nwgint_path'], ext=se_info['image_ext'])
-        image += original_image
-
-    else:
-        
+    if gal_kws.get('BlankImage', False):
+       
         # add the background
         image += bkg
         
         # now add noise
         img_std = 1.0 / np.sqrt(np.median(wgt[bmask == 0]))
         image += (noise_rng.normal(size=image.shape) * img_std)
+        
+    elif gal_kws.get('TestInjection', False):
+        
+        #Make everything pristine
+        bkg = np.zeros_like(bkg)
+        wgt = np.ones_like(wgt)
+        bmask = np.ones_like(bmask)
+
+    else:
+
+        # take the original image and add the simulated + original images together
+        original_image = fitsio.read(se_info['nwgint_path'], ext=se_info['image_ext'])
+        image += original_image
+     
     
     return image, wgt, bkg, bmask
 
