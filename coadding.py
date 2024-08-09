@@ -65,11 +65,11 @@ class MakeSwarpCoadds(object):
             args['TILENAME'] = header['TILENAME']
             args['TILEID']   = header['TILEID']
             
-            print("Creating nwgint images for %s band" % band)
+            print("Creating nwgint images for %s band" % band, flush = True)
             
             for src in self.info[band]['src_info']:
 
-                print("Creating nwgint image for path %s" % src['image_path'])
+                print("Creating nwgint image for path %s" % src['image_path'], flush = True)
                 
                 args['IMAGE_PATH'] = src['image_path']#.replace(TMP_DIR, self.output_meds_dir) #Taking raw image first so don't need this
                 args['HEAD_PATH']  = src['head_path']
@@ -93,7 +93,7 @@ class MakeSwarpCoadds(object):
                                     --tileid %(TILEID)s \
                                     --me_wgt_keepmask STAR  \
                                     --hdupcfg $DESDM_CONFIG/Y6A1_v1_coadd_nwgint.config  \
-                                    --streak_file $DESDM_CONFIG/Y3A2_v6_streaks_update-Y1234_FINALCUT_v2.fits" % args
+                                    --streak_file $DESDM_CONFIG/Y3A2_v6_streaks_update-Y1234_FINALCUT_v2.fits > /dev/null 2>&1" % args
                 
 #                 pix_command = "$PIXCORRECT_DIR/bin/coadd_nwgint \
 #                                     -i red/D00233601_g_c50_r3650p01_immasked.fits.fz \
@@ -113,9 +113,9 @@ class MakeSwarpCoadds(object):
                 
                 os.system(pix_command)
 
-                print("FINISHED nwgint image for path %s" % src['image_path'])
+                print("FINISHED nwgint image for path %s" % src['image_path'], flush = True)
                
-        print("WE HAVE FINISHED ALL COADD_NWGINT-ING")
+        print("WE HAVE FINISHED ALL COADD_NWGINT-ING", flush = True)
         return self.info
     
         
@@ -291,11 +291,11 @@ class MakeSwarpCoadds(object):
 #                                         -BLANK_BADPIXELS Y" % args
             
             
-#             print(swarp_command_wgt)
+            print(swarp_command_wgt)
             os.system(swarp_command_wgt)
             print("Finished swarp wgt coadd for %s band" % band)
             
-#             print(swarp_command_msk)
+            print(swarp_command_msk)
             os.system(swarp_command_msk)
             print("Finished swarp msk coadd for %s band" % band)
             
