@@ -279,7 +279,8 @@ class End2EndSimulation(object):
                 y_tmp = r * np.sin(t)
 
                 #Now we change the position to account for galaxy ellipticity
-                jac = galsim.Shear(beta = beta * galsim.degrees, q = q).getMatrix()
+                #I have to use -beta to get the positions to be consistent with diffuse profile
+                jac = galsim.Shear(beta = -beta * galsim.degrees, q = q).getMatrix()
 
                 x_star = x_tmp*jac[0, 0] + y_tmp*jac[0, 1]
                 y_star = x_tmp*jac[1, 0] + y_tmp*jac[1, 1]
