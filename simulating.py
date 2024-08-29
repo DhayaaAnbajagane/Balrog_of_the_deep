@@ -264,7 +264,7 @@ class End2EndSimulation(object):
             q      = self.simulated_catalog.cat['q'][ind]
             hlr    = self.simulated_catalog.cat['hlr'][ind]
             r0     = hlr / 1.6783469900166605/0.263 #Convert from hlr to scale radius of exponential, and in pixel units
-            ang    = self.simulated_catalog.rand_rot[ind] * np.pi/180 #put it in radians
+            ang    = self.simulated_catalog.rand_rot[ind] * np.pi/180 #put it in radians. Minus sign is convention
             
             
             if True:
@@ -279,15 +279,14 @@ class End2EndSimulation(object):
                 y_tmp = r * np.sin(t)
 
                 #Now we change the position to account for galaxy ellipticity
-                #I have to use -beta to get the positions to be consistent with diffuse profile
-                jac = galsim.Shear(beta = -beta * galsim.degrees, q = q).getMatrix()
+                jac = galsim.Shear(beta = beta * galsim.degrees, q = q).getMatrix()
 
                 x_star = x_tmp*jac[0, 0] + y_tmp*jac[0, 1]
                 y_star = x_tmp*jac[1, 0] + y_tmp*jac[1, 1]
 
                 #Finally, account for the new (random) galaxy rotation
-                x_star_final = + x_star * np.cos(ang) + y_star * np.sin(ang)
-                y_star_final = - x_star * np.sin(ang) + y_star * np.cos(ang)
+                x_star_final = + x_star * np.cos(ang) - y_star * np.sin(ang)
+                y_star_final = + x_star * np.sin(ang) + y_star * np.cos(ang)
 
 
                 #Okay, now that all the rotation transforms are done, 
