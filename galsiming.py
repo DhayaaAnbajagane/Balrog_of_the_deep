@@ -1,6 +1,7 @@
 import numpy as np
 import galsim
 import joblib
+import gc
 
 
 Our_params = galsim.GSParams(maximum_fft_size = 16384)
@@ -135,11 +136,33 @@ def render_source_in_image(*, source, image_pos, local_wcs, draw_method):
 
     # draw for real
     if draw_method == 'phot':
-        stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, 
-                                 method=draw_method, offset=galsim.PositionD(x=dx, y=dy), rng = BaseDeviate)
-    else:
-        stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, 
-                                 method=draw_method, offset=galsim.PositionD(x=dx, y=dy))
+        try:
+            # if source.flux < 1e4: #This is in number of photons, since AB mag units is basically photon counts
+            #     stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, 
+            #                             method=draw_method, offset=galsim.PositionD(x=dx, y=dy), rng = BaseDeviate)
+            # else:
+            #     stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, 
+            #                              method='auto', offset=galsim.PositionD(x=dx, y=dy))
+
+            stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, 
+                                     method=draw_method, offset=galsim.PositionD(x=dx, y=dy), rng = BaseDeviate)
+            
+        except np.core._exceptions._ArrayMemoryError:
+            gc.collect() #In case any memory from the error is still allocated and can lead to fragmentation?
+            print("WE HAVE REALLY BRIGHT OBJECT (BIG ARRAY OF PHOTONS...) THAT FAILS MEMORY ALLOCATION. SO SWITCHING FROM 'PHOT' TO 'AUTO'")
+            stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, method='auto', offset=galsim.PositionD(x=dx, y=dy))
+        
+        except MemoryError:
+            gc.collect() #In case any memory from the error is still allocated and can lead to fragmentation?
+            print("WE HAVE REALLY BRIGHT OBJECT (BIG ARRAY OF PHOTONS...) THAT FAILS MEMORY ALLOCATION. SO SWITCHING FROM 'PHOT' TO 'AUTO'")
+            stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, method='auto', offset=galsim.PositionD(x=dx, y=dy))
+
+        except Exception as e:
+            gc.collect() #Just in case I guess, idk
+            print(f"WE HAVE EXCEPTION {e}")
+            print("RETRY BUT NOW SWITCHING FROM 'PHOT' TO 'AUTO'")
+            stamp = source.drawImage(nx=_im.shape[1], ny=_im.shape[0], wcs=local_wcs, method='auto', offset=galsim.PositionD(x=dx, y=dy))
+
     stamp.setOrigin(x_ll, y_ll)
 
     return stamp

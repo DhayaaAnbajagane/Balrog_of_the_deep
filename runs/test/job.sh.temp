@@ -11,6 +11,7 @@
 #SBATCH --mail-user=dhayaa@uchicago.edu
 #SBATCH --mail-type=BEGIN,END
 
+set -e
 
 if [ "$USER" == "dhayaa" ]
 then

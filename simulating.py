@@ -30,6 +30,25 @@ logger = logging.getLogger(__name__)
 
 TMP_DIR = os.environ['TMPDIR']
 
+from functools import wraps
+import time
+def retry_on_exception(max_attempts=20, sleep_time=10):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            counter = 0
+            while counter < max_attempts:
+                try:
+                    return func(*args, **kwargs)  # Attempt to execute the function
+                except Exception as e:
+                    print(f"BROKE DURING OPERATION. RETRYING AGAIN... ({counter + 1} TRIES SO FAR)")
+                    time.sleep(sleep_time + 3 * np.random.rand())
+                    counter += 1
+            # If we reach here, all attempts have failed
+            raise RuntimeError(f"FAILED OPERATION AFTER {max_attempts} ATTEMPTS. BREAKING....")
+        return wrapper
+    return decorator
+
 class End2EndSimulation(object):
     """An end-to-end DES Y3 simulation.
 
@@ -160,11 +179,20 @@ class End2EndSimulation(object):
                 print("NO OBJECTS SIMULATED")
                 jobs.append(joblib.delayed(_move_se_img_wgt_bkg)(se_info=se_info, output_meds_dir=self.output_meds_dir))
 
-        #Have to do single threaded, cause dwarves are large objects (100s of arcsec)
-        #so it is highly memory intensive to draw in galsim, on DECam images.
-        with joblib.Parallel(n_jobs = -1, backend='loky', verbose=50, max_nbytes=None) as p:
-            p(jobs)
-
+        try:
+            with joblib.Parallel(n_jobs = -1, backend='loky', verbose=50, max_nbytes=None) as p:
+                p(jobs)
+        
+        except Exception as e:
+            print("======================================================================================")
+            print("======================================================================================")
+            print(f"\n\n\n HIT EXCEPTION {e}. RETRYING SINGLE-THREADED VERSION \n\n\n ")
+            print("======================================================================================")
+            print("======================================================================================")
+            
+            with joblib.Parallel(n_jobs = 1, verbose=50, max_nbytes=None) as p:
+                p(jobs)
+            
     def _make_psf_wrapper(self, *, se_info):
         
         wcs = get_galsim_wcs(image_path=se_info['image_path'], image_ext=se_info['image_ext'])
@@ -476,6 +504,7 @@ def _render_all_objects(
     return im.array
 
 
+@retry_on_exception(max_attempts = 20, sleep_time = 5)
 def _add_noise_mask_background(*, image, se_info, noise_seed, gal_kws):
     """add noise, mask and background to an image, remove the zero point"""
 
@@ -522,6 +551,7 @@ def _add_noise_mask_background(*, image, se_info, noise_seed, gal_kws):
     return image, wgt, bkg, bmask
 
 
+@retry_on_exception(max_attempts = 20, sleep_time = 5)
 def _write_se_img_wgt_bkg(
         *, image, weight, background, bmask, se_info, output_meds_dir):
     
@@ -563,6 +593,7 @@ def _write_se_img_wgt_bkg(
                 fits[se_info['bkg_ext']].write(background)
                 
 
+@retry_on_exception(max_attempts = 20, sleep_time = 5)
 def _move_se_img_wgt_bkg(*, se_info, output_meds_dir):
     '''
     Use this for blank image run where we do no source injection
