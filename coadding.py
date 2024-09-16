@@ -20,7 +20,7 @@ class MakeSwarpCoadds(object):
         self.output_meds_dir = output_meds_dir
         self.tilename = tilename
         self.bands = bands
-        
+        self.config = config
         
         self.info = {}
         for band in bands:
@@ -327,6 +327,7 @@ class MakeSwarpCoadds(object):
                         
         return 1
         
+    
     def _make_detection_coadd(self):
         '''
         Combine swarp coadds to make detection coadd for
@@ -337,7 +338,15 @@ class MakeSwarpCoadds(object):
         #Get header from original coadd to get center in RA and DEC
         header = fitsio.read_header(self.info[self.bands[0]]['image_path'], ext = 1)
 
-        det_bands = "gri"
+
+        #Need this condition because some processing tags only used riz detection
+        #and do not have gri detections. Ensure that user is providing the 
+        #necessary bands for doing detection as needed.
+        if self.config['survey_kws']['name'] in ['DR3_1', 'DR3_2', 'DR3']:
+            det_bands = "riz"
+        else:
+            det_bands = "gri"
+        
         
         assert np.sum([d in self.bands for d in det_bands]) == len(det_bands), "We need detection bands %s"%det_bands
 
