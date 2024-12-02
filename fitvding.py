@@ -204,7 +204,7 @@ class MakeFitvdCats(object):
         self.shredx_path = self.base_path + '/shredx.fits'
         self.fitvd_path  = self.base_path + '/fitvd.fits'
         self.config_path = fitvd_config_path
-    
+        self.config      = config 
     
     def run(self):
         
@@ -244,10 +244,10 @@ class MakeFitvdCats(object):
         # Chunk up the fofs groups:
         srcex  = fitsio.read(self.files['srcext'][self.bands[0]]) #All bands have same detection catalog so this index is fine
         n_objs = len(srcex)
-
+        n_jobs = np.min([os.cpu_count(), self.config.get('fitvd', {}).get('n_jobs', 10000)])
         print("n_objs groups: ", n_objs)
 
-        n_chunks = np.min([n_objs, os.cpu_count()])
+        n_chunks = np.min([n_objs, n_jobs])
         n_objs_chunks = n_objs // n_chunks
 
         print("n_chunks : ", n_chunks)
@@ -306,7 +306,7 @@ class MakeFitvdCats(object):
             
         with joblib.parallel_backend("loky"):
             jobs    = [joblib.delayed(run_fitvd_per_chunk)(i) for i in range(len(starts_ends))]
-            outputs = joblib.Parallel(n_jobs = -1, verbose=10)(jobs)
+            outputs = joblib.Parallel(n_jobs = n_jobs, verbose=10)(jobs)
             
         print("FINISHED FITVD CHUNKS")
     
