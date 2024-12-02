@@ -283,8 +283,7 @@ class MakeFitvdCats(object):
                    }
                     
             
-            FITVD_COMMAND = "taskset -c %(CPU)d \
-                             fitvd --start %(START)d \
+            FITVD_COMMAND = "fitvd --start %(START)d \
                                    --end %(END)d \
                                    --seed 401349271 \
                                    --config %(CONFIG)s \
