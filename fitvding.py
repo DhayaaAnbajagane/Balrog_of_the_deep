@@ -1,6 +1,6 @@
 import numpy as np
 import yaml
-import os, glob, sys
+import os, glob, sys, subprocess as sp
 from constants import MEDSCONF, PIFF_RUN
 from files import get_meds_file_path, get_fitvd_path, get_band_info_file
 import fitsio
@@ -264,14 +264,18 @@ class MakeFitvdCats(object):
         print("MADE FITVD CHUNKS")
 
         
-        def run_fitvd_per_chunk(start, end):
+        def run_fitvd_per_chunk(i):
             
+            start = starts_ends[i][0]
+            end   = starts_ends[i][1]
+
             os.makedirs(self.base_path + '/fitvd_chunks/', exist_ok = True)
             fitvd_chunk_path = self.base_path + '/fitvd_chunks/' + self.tilename + "_fitvd-chunk_%09d-%09d.fits" % (start,end)
 
             
             args = {'START' : start,
                     'END' : end,
+                    'CPU' : i,
                     'CONFIG' : self.config_path,
                     'OUTPUT' : fitvd_chunk_path,
                     'SHREDX_PATH' : self.shredx_path,
@@ -279,7 +283,8 @@ class MakeFitvdCats(object):
                    }
                     
             
-            FITVD_COMMAND = "fitvd --start %(START)d \
+            FITVD_COMMAND = "taskset -c %(CPU)d \
+                             fitvd --start %(START)d \
                                    --end %(END)d \
                                    --seed 401349271 \
                                    --config %(CONFIG)s \
@@ -295,7 +300,8 @@ class MakeFitvdCats(object):
 #                                    %(MEDS_PATHS)s" % args
             
                 
-            os.system(FITVD_COMMAND)
+            #os.system(FITVD_COMMAND)
+            sp.run(FITVD_COMMAND, shell=True, check=True)
             
             
         with joblib.parallel_backend("loky"):
@@ -320,7 +326,8 @@ class MakeFitvdCats(object):
                                                --output %(OUTPUT)s \
                                                %(FILELIST)s" % args
         
-        os.system(FITVD_COLLATE_COMMAND)
+        sp.run(FITVD_COLLATE_COMMAND, shell=True, check=True)
+        #os.system(FITVD_COLLATE_COMMAND)
         
         print("FINISHED COLLATING FITVD CHUNKS", self.fitvd_path)
         
