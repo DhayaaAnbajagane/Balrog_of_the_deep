@@ -305,7 +305,7 @@ class MakeFitvdCats(object):
             
             
         with joblib.parallel_backend("loky"):
-            jobs    = [joblib.delayed(run_fitvd_per_chunk)(*starts_ends[i]) for i in range(len(starts_ends))]
+            jobs    = [joblib.delayed(run_fitvd_per_chunk)(i) for i in range(len(starts_ends))]
             outputs = joblib.Parallel(n_jobs = -1, verbose=10)(jobs)
             
         print("FINISHED FITVD CHUNKS")
