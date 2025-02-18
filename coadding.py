@@ -344,6 +344,19 @@ class MakeSwarpCoadds(object):
         #necessary bands for doing detection as needed.
         if self.config['survey_kws']['name'] in ['DR3_1', 'DR3_2', 'DR3']:
             det_bands = "riz"
+
+        #SEXTANS_B is older processing that used just gi for everything and
+        #has gri for some runs that we check
+        elif self.config['survey_kws']['name'] in ['SEXB_COADD']:
+            det_bands = 'gi'
+            
+            #The tiles that were processed with gri
+            gri_tiles = ["DES1005+0500", "DES0957+0500", "DES1000+0500", "DES0954+0500", "DES0956+0418", "DES1002+0626", "DES1003+0500", 
+                         "DES0958+0543", "DES0959+0626", "DES0959+0418", "DES1001+0543", "DES0956+0626", "DES1002+0418", "DES0955+0543", "DES1004+0543" ]
+            if self.tilename in gri_tiles:
+                det_bands = 'gri'
+
+        #Assume all other tags use gri
         else:
             det_bands = "gri"
         
