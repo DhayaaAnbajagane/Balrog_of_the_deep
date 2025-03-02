@@ -55,7 +55,9 @@ def make_meds_files(*, tilename, bands, output_meds_dir, psf_kws, meds_config):
     #since we use the r-band truth catalog below.
     #Rest of code uses only bands provided in $bands
     #This allows meds to be running band-per-band as separate processes.
-    tmp_bands = bands if 'r' in bands else 'r' + bands
+    #Dhayaa: Actually we now flip this to use only the inputted bands.
+    #Some tiles in DELVE DEEP have no 'r' band.
+    tmp_bands = bands #if 'r' in bands else 'r' + bands
 
     for band in tmp_bands:
         # get info about files
@@ -81,7 +83,8 @@ def make_meds_files(*, tilename, bands, output_meds_dir, psf_kws, meds_config):
             print(info[band]['image_path'])
         
     # always get the truth catalog from r band
-    cat = fitsio.read(info['r']['cat_path'].replace(
+    # DHAYAA: Now we always get it from the first band
+    cat = fitsio.read(info[tmp_bands[0]]['cat_path'].replace(
         TMP_DIR, output_meds_dir))
 
     for band in bands:
