@@ -75,7 +75,7 @@ class MakeShredxCats(object):
     def make_fofs(self):
        
         # Not in parallel:
-        fof_command = "shredx-make-fofs --output " + self.fof_path + " --seg " + self.files['segmap']['r']
+        fof_command = "shredx-make-fofs --output " + self.fof_path + " --seg " + self.files['segmap'][self.bands[0]]
 
         os.system(fof_command)
         
@@ -113,7 +113,7 @@ class MakeShredxCats(object):
             os.makedirs(self.base_path + '/shredx_chunks/', exist_ok = True)
             shredx_chunk_path = self.base_path + '/shredx_chunks/' + self.tilename + "_shredx-chunk_%09d-%09d.fits" % (start,end)
 
-            args = {'SRCEXT_PATH' : self.files['srcext']['r'], #Just need one, so always use r-band
+            args = {'SRCEXT_PATH' : self.files['srcext'][self.bands[0]], #Just need one, so always use first band. We used to default to r-band
                     'START' : start,
                     'END' : end,
                     'COADD_IMAGES' : " ".join([self.files['coadd'][b] for b in self.bands]),
@@ -121,7 +121,7 @@ class MakeShredxCats(object):
                     'CONFIG' : self.config_path,
                     'OUTFILE' : shredx_chunk_path,
                     'FOFLIST' : self.fof_path,
-                    'SEGMAP_PATH' : self.files['segmap']['i'] #Y6 uses i-band here so I do the same
+                    'SEGMAP_PATH' : self.files['segmap'][self.bands[0]] #Y6 uses i-band here so I do the same. Now I default to first band.
                    }
                     
             SHREDX_COMMAND = "shredx --cat %(SRCEXT_PATH)s \
@@ -316,7 +316,7 @@ class MakeFitvdCats(object):
         file_list = sorted(glob.glob(self.base_path + '/fitvd_chunks/' + self.tilename + "_fitvd-chunk_*"))
         
         args = {'TILENAME' : self.tilename,
-                'MEDS_PATH' : self.files['meds']['r'],
+                'MEDS_PATH' : self.files['meds'][self.bands[0]], #Used to default to r-band, but now switching to first band always
                 'OUTPUT' : self.fitvd_path,
                 'FILELIST' : ' '.join(file_list)}
         
