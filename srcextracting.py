@@ -50,7 +50,8 @@ class MakeSrcExtractorCat(object):
             
             #Copy segmentation file over
             #Needed for meds-making code
-            shutil.copy(self.info[band]['seg_path'], seg_file)
+            #DHAYAA: SKIP THIS BECAUSE SEG FILE NO LONGER AVAILABLE ON DECARCHIVE
+            #shutil.copy(self.info[band]['seg_path'], seg_file)
 
             #Setup args
             args = {'DET_COADD' : os.path.join(self.swarp_path, self.tilename + '_det.fits'),
